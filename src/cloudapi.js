@@ -6,6 +6,7 @@ const { findMedia } = require('./media');
 const { getAIReply } = require('./ai');
 const { interMessageDelay } = require('./utils/humanizer');
 const { sleep } = require('./utils/delay');
+const { getHistory, addToHistory, clearHistory, isProcessed, setLastMessage } = require('./memory');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const META_CONFIG_FILE = path.join(DATA_DIR, 'meta-config.json');
@@ -152,8 +153,11 @@ function upsertContact(state, number, name) {
 
 async function processInbound(state, from, name, text, messageId) {
   try {
+    if (!messageId) return;
+    if (isProcessed('meta_' + messageId)) return;
     state.messageCount++;
     if (isRateLimited(from)) return;
+    setLastMessage(from, text);
     await sendReadReceipt(state.meta.config, messageId);
     await sleep(500 + Math.random() * 1000);
 
@@ -164,23 +168,28 @@ async function processInbound(state, from, name, text, messageId) {
     const lower = text.toLowerCase();
     let out;
     if (lower === '!help') {
-      out = 'Available commands:\n!help - Show this help\n!ping - Pong!\n!time - Current time';
+      out = 'Available commands:\n!help - Show this help\n!ping - Pong!\n!time - Current time\n!reset - Clear conversation memory';
     } else if (lower === '!ping') {
       out = 'Pong!';
     } else if (lower === '!time') {
       out = 'Current time: ' + new Date().toLocaleTimeString();
+    } else if (lower === '!reset') {
+      clearHistory(from);
+      out = 'Conversation memory cleared. Starting fresh!';
     } else if (state.autoReply.enabled) {
       const media = state.autoReply.media ? findMedia(state.autoReply.media) : null;
       await reply(state.autoReply.message, media);
       return;
-    } else if (text) {
-      out = await getAIReply(text, [], state);
+    } else if (state.automation.aiEnabled && text) {
+      addToHistory(from, 'user', text);
+      out = await getAIReply(text, getHistory(from).slice(0, -1), state);
       if (!out) {
         state.log('AI returned nothing - staying silent for: ' + text.slice(0, 40));
         return;
       }
       const parsed = parseMediaTag(out);
       await reply(parsed.clean, parsed.file);
+      addToHistory(from, 'assistant', parsed.clean);
       return;
     }
     if (out) await reply(out);
@@ -209,7 +218,8 @@ function handleWebhookEvent(body, state) {
           state.log('Meta inbound from ' + from + ': ' + bodyText.slice(0, 80));
           processInbound(state, from, name, bodyText, msg.id);
         } else {
-          state.log('Meta inbound ' + msg.type + ' from ' + from + ' (non-text - logged only)');
+          state.log('Meta inbound ' + msg.type + ' from ' + from);
+          processInbound(state, from, name, '[User sent a ' + msg.type + ']', msg.id);
         }
       }
     }

@@ -70,6 +70,7 @@ function startServer(state, getCtx) {
       lastError: state.lastError,
       log: state.logs.slice(-20),
       autoReply: state.autoReply,
+      automation: state.automation,
       bulk: state.bulk,
       business: state.business,
       knowledgeDocs: state.knowledge.docs.map(d => ({ name: d.name, size: d.size })),
@@ -219,6 +220,16 @@ function startServer(state, getCtx) {
     }
     state.log('Auto-reply ' + (enabled ? 'ENABLED' : 'DISABLED') + (state.autoReply.media ? ' (with media)' : ''));
     res.json({ ok: true, autoReply: state.autoReply });
+  });
+
+  app.post('/api/automation', (req, res) => {
+    const { aiEnabled } = req.body || {};
+    if (typeof aiEnabled !== 'boolean') {
+      return res.status(400).json({ ok: false, error: '"aiEnabled" must be a boolean' });
+    }
+    state.automation.aiEnabled = aiEnabled;
+    state.log('AI automation ' + (aiEnabled ? 'ENABLED - bot answers every customer like your business' : 'DISABLED - bot stays silent'));
+    res.json({ ok: true, automation: state.automation });
   });
 
   app.post('/api/ai/test', async (req, res) => {

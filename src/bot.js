@@ -11,6 +11,7 @@ const { getAIReply } = require('./ai');
 const { findMedia, getMediaType } = require('./media');
 const { humanTypingDelay, interMessageDelay } = require('./utils/humanizer');
 const { sleep } = require('./utils/delay');
+const { getHistory, addToHistory, clearHistory, isProcessed, setLastMessage, getLastMessages } = require('./memory');
 
 const messageTimestamps = {};
 let activeCtx = null;
@@ -65,8 +66,18 @@ function normalizeJid(to) {
 
 function getMessageText(msg) {
   const m = msg.message || {};
-  return m.conversation || (m.extendedTextMessage && m.extendedTextMessage.text) ||
-    (m.imageMessage && m.imageMessage.caption) || (m.videoMessage && m.videoMessage.caption) || '';
+  if (m.conversation) return m.conversation;
+  if (m.extendedTextMessage && m.extendedTextMessage.text) return m.extendedTextMessage.text;
+  if (m.imageMessage && m.imageMessage.caption) return m.imageMessage.caption;
+  if (m.videoMessage && m.videoMessage.caption) return m.videoMessage.caption;
+  if (m.documentMessage && m.documentMessage.caption) return m.documentMessage.caption;
+  if (m.audioMessage || m.voiceMessage) return '';
+  return '';
+}
+
+function messageHasMedia(msg) {
+  const m = msg.message || {};
+  return !!(m.imageMessage || m.videoMessage || m.documentMessage || m.audioMessage || m.voiceMessage || m.stickerMessage);
 }
 
 async function sendMedia(sock, jid, file, caption) {
@@ -207,12 +218,20 @@ async function startBot(state) {
   sock.ev.on('messages.upsert', async ({ messages }) => {
     for (const msg of messages) {
       try {
+        if (!msg.key || !msg.key.id) continue;
+        const dedupeKey = (msg.key.remoteJid || '') + '_' + msg.key.id;
+        if (isProcessed(dedupeKey)) continue;
         if (msg.key.fromMe) continue;
         const jid = msg.key.remoteJid;
         const isGroup = jid.endsWith('@g.us');
-        const text = getMessageText(msg);
+        let text = getMessageText(msg);
+        if (!text && messageHasMedia(msg)) {
+          if (msg.message && msg.message.audioMessage) text = '[User sent a voice message]';
+          else if (msg.message && msg.message.stickerMessage) text = '[User sent a sticker]';
+          else text = '[User sent a photo/video/document]';
+        }
         state.messageCount++;
-
+        setLastMessage(jid, text);
         if (!isGroup && msg.pushName && !chatStore.contacts.has(jid)) {
           chatStore.contacts.set(jid, { id: jid, name: msg.pushName });
           scheduleCacheSave(chatStore);
@@ -246,18 +265,22 @@ async function startBot(state) {
         let out;
         const lower = text.toLowerCase();
         if (lower === '!help') {
-          out = 'Available commands:\n!help - Show this help\n!ping - Pong!\n!time - Current time';
+          out = 'Available commands:\n!help - Show this help\n!ping - Pong!\n!time - Current time\n!reset - Clear conversation memory';
         } else if (lower === '!ping') {
           out = 'Pong!';
         } else if (lower === '!time') {
           out = 'Current time: ' + new Date().toLocaleTimeString();
+        } else if (lower === '!reset') {
+          clearHistory(jid);
+          out = 'Conversation memory cleared. Starting fresh!';
         } else if (state.autoReply.enabled) {
           out = state.autoReply.message;
           const media = state.autoReply.media ? findMedia(state.autoReply.media) : null;
           await reply(out, media);
           continue;
-        } else if (text) {
-          out = await getAIReply(text, [], state);
+        } else if (state.automation.aiEnabled && text) {
+          addToHistory(jid, 'user', text);
+          out = await getAIReply(text, getHistory(jid).slice(0, -1), state);
           if (!out) {
             state.log('AI returned nothing - staying silent for: ' + text.slice(0, 40));
             continue;
@@ -265,6 +288,7 @@ async function startBot(state) {
           const parsed = parseMediaTag(out);
           out = parsed.clean;
           await reply(out, parsed.file);
+          addToHistory(jid, 'assistant', out);
           continue;
         } else {
           continue;
@@ -285,16 +309,20 @@ async function getChats(ctx) {
   const { store } = ctx;
   const result = [];
   const seen = new Set();
+  const last = getLastMessages();
   for (const chat of store.chats.values()) {
     try {
       if (chat.isGroup) continue;
       const contact = store.contacts.get(chat.id);
       const name = (contact && (contact.name || contact.notify)) || chat.name || chat.id.split('@')[0];
       seen.add(chat.id);
+      const lm = last.get(chat.id);
       result.push({
         id: chat.id,
         number: chat.id.split('@')[0],
         name: String(name),
+        lastMsg: lm ? lm.text : null,
+        lastTs: lm ? lm.ts : null,
       });
     } catch (e) { /* skip */ }
   }
@@ -303,14 +331,17 @@ async function getChats(ctx) {
       const id = contact.id;
       if (!id || seen.has(id) || id.endsWith('@g.us') || id.endsWith('@newsletter')) continue;
       const name = contact.name || contact.notify || id.split('@')[0];
+      const lm = last.get(id);
       result.push({
         id,
         number: id.split('@')[0],
         name: String(name),
+        lastMsg: lm ? lm.text : null,
+        lastTs: lm ? lm.ts : null,
       });
     } catch (e) { /* skip */ }
   }
-  return result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return result.sort((a, b) => (b.lastTs || 0) - (a.lastTs || 0));
 }
 
 async function bulkSend(ctx, numbers, message, state, mediaFile) {

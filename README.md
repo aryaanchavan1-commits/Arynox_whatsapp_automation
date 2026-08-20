@@ -1,69 +1,60 @@
-# Arynox WhatsApp Automation
+# Arynox AI — WhatsApp Automation
 
-A ban-resistant WhatsApp automation bot designed to mimic human behavior and reduce the risk of being banned by WhatsApp.
+A full WhatsApp automation bot with a 2026 AI-product dashboard. It answers customers automatically with AI (Groq + OpenCode Zen), sends bulk messages, and supports both an unofficial free connection (QR scan) and the official Meta Cloud API.
 
 ## Features
 
-- Human-like typing delays based on message length
-- Randomized delays between messages
-- Rate limiting to prevent spamming
-- Session persistence (no frequent re-login)
-- Simple command handling (!help, !ping, !time)
-- Easy to extend with AI responses (OpenRouter integration ready)
-- QR code login via WhatsApp Web
-
-## Anti-Ban Measures
-
-To minimize the risk of WhatsApp banning your account:
-
-1. **Human-like behavior**: Typing simulation and variable delays
-2. **Rate limiting**: Configurable max messages per minute per user
-3. **No bulk messaging**: Avoid sending identical messages to many users quickly
-4. **Session persistence**: Uses local auth to avoid frequent re-login triggers
-5. **Respectful usage**: Intended for personal automation, not spam marketing
+- **AI automation** — answers every customer automatically like your business representative (Groq `openai/gpt-oss-120b`, fallback OpenCode Zen `deepseek-v4-flash-free`)
+- **Conversation memory** — remembers the last 10 messages per customer (no more context-less replies)
+- **Business profile** — teach the AI your business name, products, prices, tone and rules
+- **Knowledge base (RAG)** — upload PDF/TXT/MD documents (menu, catalog, policies); the AI reads them when answering
+- **Media library** — upload images/videos/PDFs, add notes, and the AI attaches the right media automatically in replies (`[media:filename]` tags)
+- **Bulk messaging** — send text + media to all selected contacts with human-like delays and progress bar
+- **Two backends**
+  - **Unofficial** (Baileys) — free, scan QR, full contact sync
+  - **Official** (Meta Cloud API) — webhook based, business number required
+- **Anti-ban measures** — typing simulation, random delays (2–8s), per-user rate limiting (10 msgs/min), no double replies (dedupe), session persistence
+- **2026 dashboard** — dark/light themes, mobile-first, toasts, live log, stats, contact list with last messages
+- **Commands** — `!help`, `!ping`, `!time`, `!reset` (clear conversation memory)
 
 ## Installation
 
-1. Clone or download this repository
-2. Install Node.js (v16+)
-3. Run `npm install`
-4. Create a `.env` file from `.env.example` and add your OpenRouter API key (optional for AI features)
-5. Run `npm start`
-6. Scan the QR code with your WhatsApp phone (Linked Devices ? Link a Device)
+```bash
+npm install
+copy .env.example .env   # then fill in your keys
+npm start
+```
 
-## Configuration
+Open http://localhost:3000, scan the QR code (WhatsApp → Linked Devices → Link a Device), and the bot starts automating. All contacts load automatically.
 
-Edit `.env` file:
+## Configuration (.env)
 
 ```
-OPENROUTER_API_KEY=your_openrouter_api_key_here
+GROQ_API_KEY=your_groq_api_key
+OPENCODE_API_KEY=your_opencode_zen_api_key   # fallback provider
+AI_PROVIDER=groq
+GROQ_MODEL=openai/gpt-oss-120b
+OPENCODE_MODEL=deepseek-v4-flash-free
 SESSION_NAME=arynox_session
+WHATSAPP_BACKEND=baileys                      # baileys or meta
+META_TOKEN=                                   # only for official backend
+META_PHONE_NUMBER_ID=
+META_VERIFY_TOKEN=
+META_API_VERSION=v23.0
+META_PUBLIC_URL=
 ```
 
-Adjust anti-ban settings in `src/config.js`:
-- `minDelayBetweenMessages` / `maxDelayBetweenMessages`: Random delay range between messages (ms)
-- `typingDelayFactor`: Factor for typing simulation
-- `maxMessagesPerMinute`: Rate limit per user
+Anti-ban timing is in `config.js`: `minDelayBetweenMessages`, `maxDelayBetweenMessages`, `maxMessagesPerMinute`, `bulkMinDelay`, `bulkMaxDelay`.
 
-## Usage
+## Official Meta Cloud API
 
-After scanning QR code, the bot will respond to messages:
-- `!help` - Show available commands
-- `!ping` - Replies "Pong!"
-- `!time` - Shows current time
-- Any other message: Echoes back (or integrate AI)
+1. Set `WHATSAPP_BACKEND=meta` (or pick "OFFICIAL" on the dashboard and save)
+2. Create a Meta Business app, add WhatsApp, get a permanent System User token
+3. Enter token, phone number ID, verify token and your public URL (ngrok/VPS/Koyeb) in the dashboard
+4. Configure the webhook in Meta: URL `https://your-url/webhook`, verify token you chose
+5. Restart the app — customers who message the number are handled automatically
 
-## Extending with AI
+## Notes
 
-To add AI responses using OpenRouter:
-1. Get an API key from https://openrouter.ai
-2. Add it to `.env` as `OPENROUTER_API_KEY`
-3. Modify `src/bot.js` to call the OpenRouter API instead of echoing.
-
-## Disclaimer
-
-This tool is for educational purposes. WhatsApp's Terms of Service prohibit automated/unofficial clients. Use at your own risk. The author is not responsible for any bans or legal issues.
-
-## License
-
-ISC
+- Unofficial backend: WhatsApp does not allow unofficial clients; the bot includes human-like delays and rate limits to minimize risk. Use responsibly.
+- The dashboard stores its data in `data/` (business profile, knowledge base, media notes, contact cache) — all gitignored.

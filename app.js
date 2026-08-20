@@ -25,6 +25,9 @@ const state = {
     message: config.autoReplyMessage,
     media: null,
   },
+  automation: {
+    aiEnabled: true,
+  },
   bulk: { active: false, total: 0, sent: 0, failed: 0, current: '', status: '' },
   refreshMedia() {
     this.media = listMedia();
