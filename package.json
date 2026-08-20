@@ -1,0 +1,23 @@
+{
+  "name": "arynox_whatsapp_automation",
+  "version": "1.0.0",
+  "description": "A ban-resistant WhatsApp automation bot with human-like delays and rate limiting",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js"
+  },
+  "keywords": "[whatsapp,automation,bot,anti-ban]",
+  "author": "Arynoxtech",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.24",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "pdf-parse": "^1.1.1",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
