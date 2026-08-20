@@ -49,6 +49,17 @@ const state = {
 
 state.refreshMedia();
 
+process.on('unhandledRejection', (e) => {
+  try {
+    state.log('Unhandled rejection: ' + ((e && e.message) || e));
+  } catch (_) { /* ignore */ }
+});
+process.on('uncaughtException', (e) => {
+  try {
+    state.log('Uncaught exception: ' + ((e && e.stack) || e));
+  } catch (_) { /* ignore */ }
+});
+
 if (state.backend === 'meta') {
   if (isConfigured(metaConfig)) {
     state.status = 'ready';

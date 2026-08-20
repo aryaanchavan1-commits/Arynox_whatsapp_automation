@@ -36,6 +36,8 @@ AI_PROVIDER=groq
 GROQ_MODEL=openai/gpt-oss-120b
 OPENCODE_MODEL=deepseek-v4-flash-free
 SESSION_NAME=arynox_session
+DASHBOARD_PASSWORD=your_dashboard_password     # REQUIRED on any public deployment
+PORT=3000
 WHATSAPP_BACKEND=baileys                      # baileys or meta
 META_TOKEN=                                   # only for official backend
 META_PHONE_NUMBER_ID=
@@ -45,6 +47,20 @@ META_PUBLIC_URL=
 ```
 
 Anti-ban timing is in `config.js`: `minDelayBetweenMessages`, `maxDelayBetweenMessages`, `maxMessagesPerMinute`, `bulkMinDelay`, `bulkMaxDelay`.
+
+## Security (production)
+
+- Set `DASHBOARD_PASSWORD` in `.env`. The dashboard then requires login (signed cookie, 7 days) — without it, **anyone who can reach the server can control the bot, read your contacts and send messages**. Never expose the server without a password.
+- The Meta access token is never sent back to the browser — only a masked preview (`EAAGxx...`); leave the field empty to keep the saved token.
+- API hardening included: rate limits on send/bulk/test endpoints (429), message length caps, recipient number validation/deduplication, JSON error responses, 100 MB upload cap.
+- Health check for hosting platforms: `GET /api/health`.
+
+## Deployment
+
+- Port: set `PORT` in `.env` (default 3000).
+- Works on Windows (run.bat / `npm start`) and Linux VPS / Koyeb (`npm start`).
+- If the port is already in use, the app exits with a clear message instead of hanging.
+- Unofficial backend keeps the WhatsApp session on disk (gitignored) — on a VPS, session reconnects automatically; scan the QR once from the dashboard.
 
 ## Official Meta Cloud API
 

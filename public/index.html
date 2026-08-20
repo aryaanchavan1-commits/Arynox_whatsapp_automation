@@ -289,6 +289,17 @@ code { background: var(--chip); padding: 2px 7px; border-radius: 6px; font-size:
 <body>
 <div class="app">
 
+  <!-- Login overlay -->
+  <div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:999;background:var(--bg);backdrop-filter:blur(8px);align-items:center;justify-content:center;">
+    <div class="card" style="max-width:340px;width:calc(100% - 40px);text-align:center;">
+      <div class="card-title" style="justify-content:center;">Arynox Automation</div>
+      <div class="hint" style="margin-top:0;margin-bottom:16px;">Enter your dashboard password to continue</div>
+      <input type="password" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn" style="width:100%;margin-top:10px;" onclick="doLogin()">Unlock Dashboard</button>
+      <div class="hint" id="loginError" style="color:#e5484d;margin-top:10px;display:none;">Wrong password</div>
+    </div>
+  </div>
+
   <!-- Sidebar (desktop) -->
   <aside class="sidebar">
     <div class="brand">
@@ -328,6 +339,9 @@ code { background: var(--chip); padding: 2px 7px; border-radius: 6px; font-size:
       <h1 id="pageTitle">Overview</h1>
       <div class="spacer"></div>
       <span class="chip" id="statusChip"><span class="dot" id="statusDot"></span><span id="statusText">Loading...</span></span>
+      <button class="icon-btn" id="logoutBtn" style="display:none;" onclick="logout()" title="Log out">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
       <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme">
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
@@ -565,6 +579,46 @@ let media = [];
 const selected = new Set();
 const PAGE_TITLES = { overview: 'Overview', contacts: 'Contacts', send: 'Send Messages', ai: 'AI & Business', media: 'Media Library' };
 
+(function authGuard() {
+  const _fetch = window.fetch;
+  window.fetch = async (...args) => {
+    const r = await _fetch(...args);
+    if (r.status === 401 && !String(args[0]).includes('/api/login')) {
+      showLogin();
+    }
+    return r;
+  };
+})();
+
+function showLogin() {
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('loginError').style.display = 'none';
+  setTimeout(() => document.getElementById('loginPass').focus(), 50);
+}
+
+async function doLogin() {
+  const pass = document.getElementById('loginPass').value;
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
+    const d = await r.json();
+    if (r.status === 401 || !d.ok) {
+      document.getElementById('loginError').style.display = 'block';
+      return;
+    }
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('loginPass').value = '';
+    toast('Dashboard unlocked');
+    refresh();
+  } catch (e) {
+    document.getElementById('loginError').style.display = 'block';
+  }
+}
+
+async function logout() {
+  try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+  location.reload();
+}
+
 function toast(msg, type) {
   const box = document.getElementById('toasts');
   const t = document.createElement('div');
@@ -626,6 +680,8 @@ function refresh() {
   fetch('/api/status').then(r => r.json()).then(d => {
     state = d;
     setStatus(d.status, d.backend, d.meta && d.meta.lastWebhookAt);
+    document.getElementById('logoutBtn').style.display = d.auth ? 'inline-flex' : 'none';
+    if (d.auth) document.getElementById('loginOverlay').style.display = 'none';
     document.getElementById('statStatus').textContent = d.status;
     document.getElementById('statPhone').textContent = d.phone || '-';
     document.getElementById('statReceived').textContent = d.messageCount;
@@ -717,7 +773,13 @@ function updateBackendUI() {
     : 'All WhatsApp contacts appear here. Search, select, then send.';
 
   if (isMeta && state.meta) {
-    document.getElementById('metaToken').value = state.meta.token || '';
+    const tokenInput = document.getElementById('metaToken');
+    if (state.meta.tokenSet) {
+      tokenInput.value = '';
+      tokenInput.placeholder = 'Saved token ' + (state.meta.tokenMasked || '...') + ' (leave empty to keep)';
+    } else {
+      tokenInput.placeholder = 'EAAG...';
+    }
     document.getElementById('metaPhoneId').value = state.meta.phoneNumberId || '';
     document.getElementById('metaVerify').value = state.meta.verifyToken || '';
     document.getElementById('metaVersion').value = state.meta.apiVersion || 'v23.0';

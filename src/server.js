@@ -2,6 +2,7 @@
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const crypto = require('crypto');
 const {
   getChats,
   bulkSend,
@@ -49,6 +50,59 @@ function startServer(state, getCtx) {
   const app = express();
   const PORT = process.env.PORT || 3000;
   const isMeta = () => state.backend === 'meta';
+  const authPassword = process.env.DASHBOARD_PASSWORD || '';
+  const authRequired = !!authPassword;
+  const revokedTokens = new Set();
+
+  function signAuthToken() {
+    const exp = String(Date.now() + 7 * 24 * 3600 * 1000);
+    const sig = crypto.createHmac('sha256', authPassword).update(exp).digest('hex');
+    return exp + '.' + sig;
+  }
+
+  function isValidAuth(req) {
+    if (!authRequired) return true;
+    const cookie = req.headers.cookie || '';
+    const m = cookie.match(/arynox_auth=([^;]+)/);
+    if (!m) return false;
+    if (revokedTokens.has(m[1])) return false;
+    const [exp, sig] = m[1].split('.');
+    if (!exp || !sig || Date.now() > Number(exp)) return false;
+    const expected = crypto.createHmac('sha256', authPassword).update(exp).digest('hex');
+    try {
+      return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  app.use('/api', (req, res, next) => {
+    if (req.path === '/login' || req.path === '/health') return next();
+    if (!isValidAuth(req)) {
+      return res.status(401).json({ ok: false, error: 'Unauthorized - login required' });
+    }
+    next();
+  });
+
+  const hitCounts = new Map();
+  function rateLimit(windowMs, max) {
+    return (req, res, next) => {
+      const now = Date.now();
+      const key = req.ip || 'unknown';
+      const arr = (hitCounts.get(key) || []).filter(t => now - t < windowMs);
+      if (arr.length >= max) {
+        return res.status(429).json({ ok: false, error: 'Too many requests - slow down' });
+      }
+      arr.push(now);
+      hitCounts.set(key, arr);
+      next();
+    };
+  }
+
+  function cleanNumber(n) {
+    return String(n || '').replace(/[^\d]/g, '');
+  }
+  const isValidNumber = n => /^\d{8,15}$/.test(n);
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.static(publicDir));
@@ -58,7 +112,39 @@ function startServer(state, getCtx) {
     res.sendFile(path.join(publicDir, 'index.html'));
   });
 
+  app.get('/api/health', (req, res) => {
+    res.json({
+      ok: true,
+      uptime: Math.floor(process.uptime()),
+      status: state.status,
+      backend: state.backend,
+      time: new Date().toISOString(),
+    });
+  });
+
+  app.post('/api/login', (req, res) => {
+    if (!authRequired) return res.json({ ok: true, auth: false });
+    const { password } = req.body || {};
+    if (typeof password !== 'string' || password.length > 200) {
+      return res.status(400).json({ ok: false, error: 'Missing password' });
+    }
+    if (password === authPassword) {
+      res.setHeader('Set-Cookie', 'arynox_auth=' + signAuthToken() + '; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800');
+      return res.json({ ok: true, auth: true });
+    }
+    res.status(401).json({ ok: false, error: 'Wrong password' });
+  });
+
+  app.post('/api/logout', (req, res) => {
+    const cookie = req.headers.cookie || '';
+    const m = cookie.match(/arynox_auth=([^;]+)/);
+    if (m) revokedTokens.add(m[1]);
+    res.setHeader('Set-Cookie', 'arynox_auth=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0');
+    res.json({ ok: true });
+  });
+
   app.get('/api/status', (req, res) => {
+    const metaToken = state.meta.config.token || '';
     res.json({
       status: state.status,
       backend: state.backend,
@@ -69,6 +155,7 @@ function startServer(state, getCtx) {
       hasQr: !!state.qr,
       lastError: state.lastError,
       log: state.logs.slice(-20),
+      auth: authRequired,
       autoReply: state.autoReply,
       automation: state.automation,
       bulk: state.bulk,
@@ -77,7 +164,8 @@ function startServer(state, getCtx) {
       mediaCount: state.media.length,
       meta: {
         configured: isConfigured(state.meta.config),
-        token: state.meta.config.token || '',
+        tokenSet: !!metaToken,
+        tokenMasked: metaToken ? metaToken.slice(0, 6) + '...' : '',
         phoneNumberId: state.meta.config.phoneNumberId || '',
         verifyToken: state.meta.config.verifyToken || '',
         apiVersion: state.meta.config.apiVersion || 'v23.0',
@@ -137,10 +225,13 @@ function startServer(state, getCtx) {
     }
   });
 
-  app.post('/api/send', async (req, res) => {
+  app.post('/api/send', rateLimit(60000, 30), async (req, res) => {
     const { to, message, mediaId } = req.body || {};
     if (!to) return res.status(400).json({ ok: false, error: 'Missing "to"' });
+    const text = String(message || '').trim();
+    if (text.length > 5000) return res.status(400).json({ ok: false, error: 'Message too long (max 5000 chars)' });
     const media = mediaId ? findMedia(mediaId) : null;
+    if (!media && !text) return res.status(400).json({ ok: false, error: 'Nothing to send' });
     try {
       if (isMeta()) {
         if (!isConfigured(state.meta.config)) {
@@ -172,11 +263,18 @@ function startServer(state, getCtx) {
     }
   });
 
-  app.post('/api/bulk-send', async (req, res) => {
+  app.post('/api/bulk-send', rateLimit(60000, 5), async (req, res) => {
     const { numbers, message, mediaId } = req.body || {};
     if (!Array.isArray(numbers) || numbers.length === 0 || !message) {
       return res.status(400).json({ ok: false, error: 'Missing "numbers" array or "message"' });
     }
+    const text = String(message).trim();
+    if (text.length > 5000) return res.status(400).json({ ok: false, error: 'Message too long (max 5000 chars)' });
+    const unique = [...new Set(numbers.map(cleanNumber).filter(isValidNumber))];
+    if (unique.length === 0) {
+      return res.status(400).json({ ok: false, error: 'No valid numbers (must be 8-15 digits with country code)' });
+    }
+    if (unique.length > 500) return res.status(400).json({ ok: false, error: 'Too many recipients (max 500)' });
     if (state.bulk && state.bulk.active) {
       return res.status(400).json({ ok: false, error: 'A bulk send is already in progress' });
     }
@@ -186,15 +284,15 @@ function startServer(state, getCtx) {
         if (!isConfigured(state.meta.config)) {
           return res.status(400).json({ ok: false, error: 'Meta Cloud API is not configured' });
         }
-        metaBulkSend(state, numbers, message, media);
+        metaBulkSend(state, unique, text, media);
       } else {
         const ctx = getCtx();
         if (!ctx || state.status !== 'ready') {
           return res.status(400).json({ ok: false, error: 'Bot is not connected yet' });
         }
-        bulkSend(ctx, numbers, message, state, media);
+        bulkSend(ctx, unique, text, state, media);
       }
-      res.json({ ok: true, started: true, total: numbers.length, media: media ? media.fileName : null });
+      res.json({ ok: true, started: true, total: unique.length, media: media ? media.fileName : null });
     } catch (e) {
       res.status(500).json({ ok: false, error: e.message || String(e) });
     }
@@ -232,7 +330,7 @@ function startServer(state, getCtx) {
     res.json({ ok: true, automation: state.automation });
   });
 
-  app.post('/api/ai/test', async (req, res) => {
+  app.post('/api/ai/test', rateLimit(60000, 20), async (req, res) => {
     const { question } = req.body || {};
     const { getAIReply } = require('./ai');
     try {
@@ -245,11 +343,12 @@ function startServer(state, getCtx) {
 
   app.post('/api/business', (req, res) => {
     const b = req.body || {};
+    const cap = (v, max) => String(v || '').trim().slice(0, max);
     state.business = {
-      businessName: String(b.businessName || ''),
-      businessDescription: String(b.businessDescription || ''),
-      tone: String(b.tone || ''),
-      rules: String(b.rules || ''),
+      businessName: cap(b.businessName, 200),
+      businessDescription: cap(b.businessDescription, 2000),
+      tone: cap(b.tone, 500),
+      rules: cap(b.rules, 2000),
     };
     saveBusiness(state.business);
     state.log('Business profile updated');
@@ -317,9 +416,10 @@ function startServer(state, getCtx) {
 
   app.post('/api/meta/config', (req, res) => {
     const b = req.body || {};
+    const prevToken = (state.meta.config && state.meta.config.token) || '';
     const cfg = {
       backend: b.backend === 'meta' ? 'meta' : 'baileys',
-      token: String(b.token || '').trim(),
+      token: String(b.token || '').trim() || prevToken,
       phoneNumberId: String(b.phoneNumberId || '').trim(),
       verifyToken: String(b.verifyToken || '').trim(),
       apiVersion: String(b.apiVersion || 'v23.0').trim(),
@@ -392,9 +492,32 @@ function startServer(state, getCtx) {
     }
   });
 
-  app.listen(PORT, () => {
+  app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ ok: false, error: 'File too large (max 100 MB)' });
+      }
+      return res.status(400).json({ ok: false, error: 'Upload error: ' + err.code });
+    }
+    if (err.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+      return res.status(400).json({ ok: false, error: 'Invalid JSON body' });
+    }
+    console.error('API error:', err);
+    res.status(500).json({ ok: false, error: 'Internal server error' });
+  });
+
+  const server = app.listen(PORT, () => {
     console.log('Dashboard: http://localhost:' + PORT);
-    state.log('Dashboard running on http://localhost:' + PORT);
+    state.log('Dashboard running on http://localhost:' + PORT + (authRequired ? ' (password protected)' : ''));
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error('Port ' + PORT + ' is already in use. Close the other process or set PORT=<free port> in .env');
+      process.exit(1);
+    }
+    console.error('Server error:', err);
+    process.exit(1);
   });
 
   return app;
