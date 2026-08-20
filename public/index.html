@@ -1,295 +1,712 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Arynox WhatsApp Automation - Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0f1e">
+<title>Arynox AI — WhatsApp Automation</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
-  header { background: #1e293b; padding: 18px 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; position: sticky; top: 0; z-index: 10; }
-  header h1 { font-size: 20px; color: #25D366; }
-  header h1 span { color: #94a3b8; font-weight: 400; }
-  .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 13px; background: #334155; }
-  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #64748b; }
-  .status-pill.ready { background: #064e3b; color: #6ee7b7; } .status-pill.ready .status-dot { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
-  .status-pill.qr, .status-pill.authenticated { background: #713f12; color: #fde68a; } .status-pill.qr .status-dot, .status-pill.authenticated .status-dot { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; animation: blink 1.2s infinite; }
-  .status-pill.error { background: #7f1d1d; color: #fecaca; } .status-pill.error .status-dot { background: #ef4444; }
-  @keyframes blink { 50% { opacity: 0.3; } }
-  main { max-width: 1200px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; }
-  .card h2 { font-size: 15px; margin-bottom: 14px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
-  .full { grid-column: 1 / -1; }
-  #qrWrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-  #qrImg { width: 280px; height: 280px; border-radius: 12px; background: #fff; padding: 10px; }
-  #qrImg.placeholder { background: #0f172a; border: 2px dashed #334155; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 14px; text-align: center; }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-  .stat { background: #0f172a; border-radius: 10px; padding: 14px; }
-  .stat .label { font-size: 12px; color: #94a3b8; }
-  .stat .value { font-size: 20px; font-weight: 700; color: #f1f5f9; margin-top: 4px; }
-  label { font-size: 13px; color: #94a3b8; display: block; margin: 8px 0 4px; }
-  input, textarea, select { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 10px 12px; border-radius: 8px; font-size: 14px; outline: none; width: 100%; font-family: inherit; }
-  input:focus, textarea:focus { border-color: #25D366; }
-  textarea { resize: vertical; min-height: 60px; }
-  .btn { background: #25D366; color: #052e16; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; }
-  .btn:hover { filter: brightness(1.1); }
-  .btn.danger { background: #ef4444; color: #fff; }
-  .btn.small { padding: 6px 12px; font-size: 12px; }
-  .btn.ghost { background: #334155; color: #e2e8f0; }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  #logBox { background: #0f172a; border-radius: 10px; padding: 12px; height: 160px; overflow-y: auto; font-family: Consolas, monospace; font-size: 12px; line-height: 1.7; }
-  #logBox div { border-bottom: 1px solid #1e293b; }
-  .msg { color: #22c55e; margin-top: 6px; font-size: 13px; }
-  .msg.err { color: #f87171; }
-  .row { display: flex; gap: 10px; }
-  .row > * { flex: 1; }
-  .switch { position: relative; display: inline-block; width: 52px; height: 28px; flex: 0 0 52px; }
-  .switch input { opacity: 0; width: 0; height: 0; }
-  .slider { position: absolute; cursor: pointer; inset: 0; background: #334155; border-radius: 28px; transition: 0.3s; }
-  .slider:before { content: ""; position: absolute; height: 22px; width: 22px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: 0.3s; }
-  .switch input:checked + .slider { background: #25D366; }
-  .switch input:checked + .slider:before { transform: translateX(24px); }
-  .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-  .toggle-row .lbl { font-size: 15px; font-weight: 600; color: #f1f5f9; }
-  #contactsBox { max-height: 300px; overflow-y: auto; background: #0f172a; border-radius: 10px; padding: 8px; }
-  .contact-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
-  .contact-item:hover { background: #1e293b; }
-  .contact-item input { width: 16px; height: 16px; flex: 0 0 16px; }
-  .contact-item .c-name { font-size: 14px; font-weight: 600; color: #f1f5f9; }
-  .contact-item .c-num { font-size: 12px; color: #64748b; }
-  .contacts-tools { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
-  .contacts-tools input { flex: 1; min-width: 160px; }
-  .bar-outer { background: #0f172a; border-radius: 10px; height: 16px; overflow: hidden; margin-top: 12px; }
-  .bar-inner { height: 100%; width: 0%; background: linear-gradient(90deg, #25D366, #16a34a); transition: width 0.5s; }
-  .bulk-info { font-size: 13px; color: #94a3b8; margin-top: 8px; }
-  .count-badge { background: #334155; border-radius: 20px; padding: 3px 10px; font-size: 12px; color: #e2e8f0; }
-  .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-  .media-item { background: #0f172a; border-radius: 10px; overflow: hidden; border: 1px solid #334155; }
-  .media-item .m-thumb { width: 100%; height: 110px; object-fit: cover; background: #000; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 12px; }
-  .media-item .m-body { padding: 8px; }
-  .media-item .m-name { font-size: 11px; color: #94a3b8; word-break: break-all; }
-  .media-item .m-note input { padding: 6px; font-size: 12px; margin-top: 6px; }
-  .media-item .m-actions { display: flex; gap: 6px; padding: 8px; }
-  .media-item .m-actions .btn { flex: 1; padding: 5px; font-size: 11px; }
-  .doc-row { display: flex; align-items: center; justify-content: space-between; background: #0f172a; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; }
-  .doc-row .d-name { font-size: 13px; color: #e2e8f0; word-break: break-all; }
-  .hint { font-size: 12px; color: #64748b; margin-top: 6px; }
-  .backend-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .backend-tile { background: #0f172a; border: 2px solid #334155; border-radius: 12px; padding: 16px; cursor: pointer; transition: 0.2s; }
-  .backend-tile:hover { border-color: #475569; }
-  .backend-tile.active { border-color: #25D366; background: #052e16; }
-  .backend-tile .bt-title { font-size: 15px; font-weight: 800; letter-spacing: 1px; color: #f1f5f9; }
-  .backend-tile.active .bt-title { color: #25D366; }
-  .backend-tile .bt-desc { font-size: 12px; color: #94a3b8; margin-top: 4px; }
-  .panel-title { font-size: 14px; font-weight: 700; color: #e2e8f0; margin-bottom: 10px; }
-  @media (max-width: 800px) { .backend-tiles { grid-template-columns: 1fr; } }
-  @media (max-width: 800px) { main { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
+:root {
+  --bg: #0a0f1e;
+  --bg2: #101729;
+  --bg3: #0d1322;
+  --card: #151d33;
+  --card-hover: #1a2340;
+  --border: #233052;
+  --border-soft: #1c2747;
+  --text: #eef2ff;
+  --text2: #93a0c8;
+  --text3: #5c6a94;
+  --accent: #25d366;
+  --accent-2: #8b5cf6;
+  --accent-grad: linear-gradient(135deg, #25d366, #8b5cf6);
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --chip: #1a2340;
+  --shadow: 0 8px 32px rgba(0,0,0,.45);
+  --radius: 18px;
+  --radius-sm: 12px;
+}
+html[data-theme="light"] {
+  --bg: #f4f6fb;
+  --bg2: #ffffff;
+  --bg3: #eef1f8;
+  --card: #ffffff;
+  --card-hover: #f7f9ff;
+  --border: #dfe5f2;
+  --border-soft: #e8edf7;
+  --text: #0f172a;
+  --text2: #47557a;
+  --text3: #8494b8;
+  --chip: #eef1f8;
+  --shadow: 0 8px 28px rgba(30,40,90,.10);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; transition: background .3s, color .3s;
+}
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, textarea, select { font-family: inherit; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.app { display: flex; min-height: 100vh; }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  width: 240px; flex: 0 0 240px; background: var(--bg2);
+  border-right: 1px solid var(--border-soft);
+  padding: 20px 14px; display: flex; flex-direction: column; gap: 6px;
+  position: sticky; top: 0; height: 100vh; z-index: 50;
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; }
+.brand-logo {
+  width: 38px; height: 38px; border-radius: 12px; background: var(--accent-grad);
+  display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 17px;
+  box-shadow: 0 4px 14px rgba(37,211,102,.35);
+}
+.brand-name { font-weight: 800; font-size: 16px; letter-spacing: -.2px; }
+.brand-sub { font-size: 11px; color: var(--text3); font-weight: 500; }
+.nav-item {
+  display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: var(--radius-sm);
+  color: var(--text2); font-size: 14px; font-weight: 600; transition: .2s; width: 100%; text-align: left;
+}
+.nav-item svg { width: 20px; height: 20px; flex: 0 0 20px; }
+.nav-item:hover { background: var(--chip); color: var(--text); }
+.nav-item.active { background: var(--chip); color: var(--text); box-shadow: inset 3px 0 0 var(--accent); }
+.nav-badge { margin-left: auto; background: var(--accent); color: #062b16; font-size: 11px; font-weight: 800; border-radius: 20px; padding: 2px 8px; }
+.sidebar-foot { margin-top: auto; padding: 10px 12px; font-size: 11px; color: var(--text3); border-top: 1px solid var(--border-soft); }
+
+/* ---------- Main ---------- */
+.main { flex: 1; min-width: 0; padding: 26px 30px 40px; }
+.topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+.topbar h1 { font-size: 22px; font-weight: 800; letter-spacing: -.4px; }
+.topbar .spacer { flex: 1; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 30px;
+  background: var(--chip); border: 1px solid var(--border-soft); font-size: 12.5px; font-weight: 700;
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text3); }
+.dot.on { background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: pulse 1.6s infinite; }
+.dot.warn { background: var(--warn); box-shadow: 0 0 10px var(--warn); animation: pulse 1.6s infinite; }
+.dot.err { background: var(--danger); }
+@keyframes pulse { 50% { opacity: .45; } }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 12px; background: var(--chip); border: 1px solid var(--border-soft);
+  display: flex; align-items: center; justify-content: center; color: var(--text2); transition: .2s;
+}
+.icon-btn:hover { color: var(--text); transform: translateY(-1px); }
+.icon-btn svg { width: 20px; height: 20px; }
+
+.page { display: none; animation: fadeIn .25s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.grid { display: grid; gap: 18px; }
+.grid-2 { grid-template-columns: 1fr 1fr; }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 860px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } .main { padding: 18px 16px 120px; } }
+
+.card {
+  background: var(--card); border: 1px solid var(--border-soft); border-radius: var(--radius);
+  padding: 20px; box-shadow: var(--shadow); transition: border-color .2s;
+}
+.card-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text2); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.card-title svg { width: 16px; height: 16px; color: var(--accent); }
+.hint { font-size: 12px; color: var(--text3); margin-top: 8px; line-height: 1.5; }
+label.f { font-size: 12.5px; font-weight: 700; color: var(--text2); display: block; margin: 12px 0 6px; }
+input[type=text], input[type=password], input[type=number], textarea, select {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  padding: 12px 14px; border-radius: var(--radius-sm); font-size: 14px; outline: none; transition: border .2s, box-shadow .2s;
+}
+input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,211,102,.15); }
+textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
+select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2393a0c8' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 38px; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--accent-grad); color: #fff; font-weight: 800; font-size: 14px;
+  padding: 12px 20px; border-radius: var(--radius-sm); transition: .2s; box-shadow: 0 4px 16px rgba(37,211,102,.28);
+}
+.btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn.ghost { background: var(--chip); color: var(--text); box-shadow: none; border: 1px solid var(--border-soft); }
+.btn.ghost:hover { border-color: var(--text3); }
+.btn.danger { background: var(--danger); box-shadow: 0 4px 16px rgba(248,113,113,.25); }
+.btn.sm { padding: 8px 14px; font-size: 13px; }
+.btn svg { width: 17px; height: 17px; }
+.row { display: flex; gap: 10px; align-items: center; }
+.row > .grow { flex: 1; min-width: 0; }
+.wrap { flex-wrap: wrap; }
+
+/* ---------- Backend tiles ---------- */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .tiles { grid-template-columns: 1fr; } }
+.tile {
+  background: var(--bg3); border: 2px solid var(--border); border-radius: 16px; padding: 16px;
+  cursor: pointer; transition: .2s; text-align: left;
+}
+.tile:hover { border-color: var(--text3); transform: translateY(-2px); }
+.tile.active { border-color: var(--accent); background: rgba(37,211,102,.08); }
+.tile .t-title { font-size: 15px; font-weight: 800; letter-spacing: .6px; display: flex; align-items: center; gap: 8px; }
+.tile .t-desc { font-size: 12px; color: var(--text2); margin-top: 5px; line-height: 1.45; }
+.tile .t-check { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); flex: 0 0 20px; display: flex; align-items: center; justify-content: center; color: transparent; }
+.tile.active .t-check { background: var(--accent); border-color: var(--accent); color: #062b16; }
+
+/* ---------- QR ---------- */
+.qr-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 10px 0; }
+.qr-frame {
+  background: #fff; border-radius: 22px; padding: 14px; box-shadow: var(--shadow);
+  max-width: 300px; width: 100%;
+}
+.qr-frame img { width: 100%; display: block; border-radius: 12px; }
+.qr-placeholder {
+  background: var(--bg3); border: 2px dashed var(--border); border-radius: 22px;
+  display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 13px; text-align: center;
+  min-height: 240px; padding: 20px;
+}
+.qr-hint { font-size: 13px; color: var(--text2); text-align: center; line-height: 1.6; }
+
+/* ---------- Stats ---------- */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 640px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+.stat { background: var(--bg3); border: 1px solid var(--border-soft); border-radius: 14px; padding: 14px 16px; }
+.stat .s-label { font-size: 11px; color: var(--text3); font-weight: 700; text-transform: uppercase; letter-spacing: .8px; }
+.stat .s-value { font-size: 21px; font-weight: 800; margin-top: 4px; letter-spacing: -.4px; }
+.stat .s-value small { font-size: 12px; color: var(--text3); font-weight: 600; }
+
+/* ---------- Contacts ---------- */
+.search-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.search-row input { flex: 1; min-width: 180px; }
+.contact-list { display: flex; flex-direction: column; gap: 6px; max-height: 56vh; overflow-y: auto; padding-right: 4px; }
+.contact {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px;
+  background: var(--bg3); border: 1px solid var(--border-soft); transition: .15s; cursor: pointer;
+}
+.contact:hover { border-color: var(--text3); }
+.contact.selected { border-color: var(--accent); background: rgba(37,211,102,.07); }
+.avatar {
+  width: 42px; height: 42px; border-radius: 50%; flex: 0 0 42px;
+  display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; color: #fff;
+}
+.c-info { flex: 1; min-width: 0; }
+.c-name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c-num { font-size: 12px; color: var(--text3); }
+.check {
+  width: 24px; height: 24px; border-radius: 8px; border: 2px solid var(--border); flex: 0 0 24px;
+  display: flex; align-items: center; justify-content: center; color: transparent; transition: .15s; background: var(--bg);
+}
+.contact.selected .check { background: var(--accent); border-color: var(--accent); color: #062b16; }
+.empty { text-align: center; color: var(--text3); font-size: 13.5px; padding: 30px 10px; }
+.empty svg { width: 40px; height: 40px; opacity: .4; margin-bottom: 10px; }
+
+/* ---------- Bulk bar ---------- */
+.bulk-bar {
+  position: sticky; bottom: 14px; z-index: 40; margin-top: 16px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 12px 16px; box-shadow: var(--shadow);
+}
+@media (max-width: 860px) {
+  .bulk-bar { position: fixed; left: 10px; right: 10px; bottom: calc(74px + env(safe-area-inset-bottom)); }
+}
+.bulk-count { font-weight: 800; font-size: 14px; }
+.bulk-count small { color: var(--text2); font-weight: 600; }
+.progress { height: 8px; background: var(--bg3); border-radius: 8px; overflow: hidden; width: 100%; margin-top: 10px; }
+.progress > div { height: 100%; background: var(--accent-grad); width: 0%; border-radius: 8px; transition: width .4s; }
+.bulk-status { font-size: 12.5px; color: var(--text2); margin-top: 6px; }
+
+/* ---------- Media ---------- */
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.media-item { background: var(--bg3); border: 1px solid var(--border-soft); border-radius: 14px; overflow: hidden; }
+.media-item .m-thumb { width: 100%; height: 104px; object-fit: cover; background: #000; display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 11px; }
+.media-item .m-body { padding: 8px 10px; }
+.media-item .m-name { font-size: 10.5px; color: var(--text3); word-break: break-all; }
+.media-item .m-note input { padding: 7px 9px; font-size: 12px; margin-top: 7px; }
+.media-item .m-actions { display: flex; gap: 6px; padding: 0 10px 10px; }
+.media-item .m-actions .btn { flex: 1; padding: 7px 0; font-size: 11.5px; }
+.doc-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg3); padding: 11px 14px; border-radius: 12px; margin-bottom: 8px; border: 1px solid var(--border-soft); }
+.doc-row .d-name { font-size: 13px; font-weight: 600; word-break: break-all; }
+
+/* ---------- Logs ---------- */
+.log-box { background: var(--bg3); border-radius: 14px; padding: 12px 14px; max-height: 220px; overflow-y: auto; font-family: Consolas, Menlo, monospace; font-size: 12px; line-height: 1.8; border: 1px solid var(--border-soft); }
+.log-box div { border-bottom: 1px solid var(--border-soft); }
+.log-box div:last-child { border-bottom: none; }
+
+/* ---------- Toasts ---------- */
+#toasts { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; width: min(92vw, 400px); }
+@media (max-width: 860px) { #toasts { bottom: calc(84px + env(safe-area-inset-bottom)); } }
+.toast {
+  background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--accent);
+  padding: 12px 16px; border-radius: 12px; font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow);
+  animation: slideUp .25s ease; display: flex; gap: 10px; align-items: center;
+}
+.toast.err { border-left-color: var(--danger); }
+.toast.info { border-left-color: var(--accent-2); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Mobile bottom nav ---------- */
+.mobile-nav {
+  display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
+  background: var(--bg2); border-top: 1px solid var(--border-soft);
+  padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
+}
+.mobile-nav .mn-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-size: 10px; font-weight: 700; color: var(--text3); padding: 6px 2px; border-radius: 12px;
+}
+.mobile-nav .mn-item svg { width: 22px; height: 22px; }
+.mobile-nav .mn-item.active { color: var(--accent); }
+@media (max-width: 860px) {
+  .sidebar { display: none; }
+  .mobile-nav { display: flex; }
+}
+
+/* ---------- Theme toggle ---------- */
+html[data-theme="light"] .icon-sun { display: block; }
+html[data-theme="light"] .icon-moon { display: none; }
+html[data-theme="dark"] .icon-sun { display: none; }
+html[data-theme="dark"] .icon-moon { display: block; }
+
+/* ---------- Misc ---------- */
+.toggle { position: relative; width: 52px; height: 30px; flex: 0 0 52px; cursor: pointer; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .sl { position: absolute; inset: 0; background: var(--border); border-radius: 30px; transition: .25s; }
+.toggle .sl:before { content: ""; position: absolute; height: 24px; width: 24px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: .25s; }
+.toggle input:checked + .sl { background: var(--accent); }
+.toggle input:checked + .sl:before { transform: translateX(22px); }
+.section-divider { margin: 22px 0 14px; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text3); }
+code { background: var(--chip); padding: 2px 7px; border-radius: 6px; font-size: 12px; }
+.ai-reply-box { background: var(--bg3); border: 1px solid var(--border-soft); border-radius: 14px; padding: 14px; font-size: 13.5px; line-height: 1.6; min-height: 60px; white-space: pre-wrap; }
+.spin { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-<header>
-  <h1>Arynox <span>WhatsApp Automation</span></h1>
-  <div id="statusPill" class="status-pill"><span class="status-dot"></span><span id="statusText">Loading...</span></div>
-</header>
+<div class="app">
 
-<main>
-  <div class="card full">
-    <h2>Connection Backend</h2>
-    <div class="backend-tiles">
-      <div class="backend-tile" id="tile-baileys" onclick="setBackend('baileys')">
-        <div class="bt-title">UNOFFICIAL</div>
-        <div class="bt-desc">Free &bull; Scan QR code &bull; No approval needed</div>
-      </div>
-      <div class="backend-tile" id="tile-meta" onclick="setBackend('meta')">
-        <div class="bt-title">OFFICIAL</div>
-        <div class="bt-desc">Meta Cloud API &bull; Business number &bull; Webhook setup</div>
+  <!-- Sidebar (desktop) -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">A</div>
+      <div>
+        <div class="brand-name">Arynox AI</div>
+        <div class="brand-sub">WhatsApp Automation</div>
       </div>
     </div>
-    <select id="backendSelect" style="display:none;">
-      <option value="baileys">baileys</option>
-      <option value="meta">meta</option>
-    </select>
-    <div id="qrPanel" style="margin-top:14px;">
-      <div class="panel-title">Unofficial connection - scan QR with WhatsApp</div>
-      <div id="qrWrap">
-        <img id="qrImg" class="placeholder" alt="QR code">
-        <div id="qrHint" style="color:#94a3b8;font-size:13px;text-align:center;">Waiting for QR code...<br>Open WhatsApp &rarr; Linked Devices &rarr; Link a Device</div>
+    <button class="nav-item active" data-page="overview" onclick="go('overview')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
+      Overview
+    </button>
+    <button class="nav-item" data-page="contacts" onclick="go('contacts')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Contacts
+      <span class="nav-badge" id="navContactBadge" style="display:none;"></span>
+    </button>
+    <button class="nav-item" data-page="send" onclick="go('send')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+      Send Messages
+    </button>
+    <button class="nav-item" data-page="ai" onclick="go('ai')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/><path d="M5.6 5.6l2.1 2.1"/><path d="M16.3 16.3l2.1 2.1"/><path d="M18.4 5.6l-2.1 2.1"/><path d="M7.7 16.3l-2.1 2.1"/></svg>
+      AI &amp; Business
+    </button>
+    <button class="nav-item" data-page="media" onclick="go('media')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      Media Library
+    </button>
+    <div class="sidebar-foot">Groq + OpenCode Zen AI<br>v2.0 · 2026</div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <h1 id="pageTitle">Overview</h1>
+      <div class="spacer"></div>
+      <span class="chip" id="statusChip"><span class="dot" id="statusDot"></span><span id="statusText">Loading...</span></span>
+      <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+    </div>
+
+    <!-- ============ OVERVIEW ============ -->
+    <section class="page active" id="page-overview">
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">Connection</div>
+          <div class="tiles">
+            <div class="tile active" id="tile-baileys" onclick="setBackend('baileys')">
+              <div class="t-title">UNOFFICIAL <span class="t-check">&#10003;</span></div>
+              <div class="t-desc">Free &bull; Scan QR code &bull; No approval needed &bull; Full contact sync</div>
+            </div>
+            <div class="tile" id="tile-meta" onclick="setBackend('meta')">
+              <div class="t-title">OFFICIAL <span class="t-check">&#10003;</span></div>
+              <div class="t-desc">Meta Cloud API &bull; Business number &bull; Webhook setup</div>
+            </div>
+          </div>
+
+          <div id="qrPanel" style="margin-top:16px;">
+            <div class="qr-wrap">
+              <div class="qr-frame" id="qrFrame">
+                <img id="qrImg" alt="QR code" style="display:none;">
+                <div class="qr-placeholder" id="qrPlaceholder">Waiting for QR code...</div>
+              </div>
+              <div class="qr-hint" id="qrHint">Open WhatsApp &rarr; Linked Devices &rarr; Link a Device</div>
+            </div>
+            <div class="row wrap" style="margin-top:12px;">
+              <button class="btn ghost sm" onclick="resetQr()">&#8635; Reset &amp; New QR</button>
+              <span class="hint" style="margin:0;">All contacts load automatically after scanning.</span>
+            </div>
+          </div>
+
+          <div id="metaPanel" style="display:none;margin-top:16px;">
+            <label class="f">Access token <code>Meta System User</code></label>
+            <input type="password" id="metaToken" placeholder="EAAG...">
+            <label class="f">Phone number ID</label>
+            <input type="text" id="metaPhoneId" placeholder="123456789012345">
+            <label class="f">Verify token (any secret you choose)</label>
+            <input type="text" id="metaVerify" placeholder="mysecret123">
+            <div class="row wrap">
+              <div style="flex:1;min-width:140px;"><label class="f">API version</label>
+              <input type="text" id="metaVersion" placeholder="v23.0"></div>
+              <div style="flex:2;min-width:200px;"><label class="f">Public URL (for webhook)</label>
+              <input type="text" id="metaPublicUrl" placeholder="https://yourname.ngrok-free.app"></div>
+            </div>
+            <div class="row wrap" style="margin-top:14px;">
+              <button class="btn sm" onclick="saveMeta()">Save Settings</button>
+              <button class="btn ghost sm" onclick="toggleMetaTest()">Send Test Message</button>
+            </div>
+            <div id="metaTestRow" style="display:none;margin-top:12px;">
+              <label class="f">Test number (with country code)</label>
+              <input type="text" id="metaTestNumber" placeholder="919876543210">
+              <label class="f">Test message</label>
+              <input type="text" id="metaTestMessage" placeholder="Hello from Arynox!" onkeydown="if(event.key==='Enter')sendMetaTest()">
+            </div>
+            <div class="hint" id="webhookInfo" style="background:var(--bg3);border:1px solid var(--border-soft);border-radius:12px;padding:12px;margin-top:14px;"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Statistics</div>
+          <div class="stats">
+            <div class="stat"><div class="s-label">Status</div><div class="s-value" id="statStatus">-</div></div>
+            <div class="stat"><div class="s-label">Phone</div><div class="s-value" id="statPhone" style="font-size:16px;">-</div></div>
+            <div class="stat"><div class="s-label">Received</div><div class="s-value" id="statReceived">0</div></div>
+            <div class="stat"><div class="s-label">Sent</div><div class="s-value" id="statSent">0</div></div>
+            <div class="stat"><div class="s-label">Uptime</div><div class="s-value" id="statUptime">0s</div></div>
+            <div class="stat"><div class="s-label">Media / KB</div><div class="s-value" id="statMedia">0 / 0</div></div>
+          </div>
+          <div class="section-divider" style="margin-top:22px;">Live Log</div>
+          <div class="log-box" id="logBox"></div>
+        </div>
       </div>
-      <div class="row" style="margin-top:12px;max-width:340px;">
-        <button class="btn ghost" onclick="resetQr()">Reset &amp; Get New QR</button>
-        <div id="qrResetMsg" class="msg" style="align-self:center;"></div>
+    </section>
+
+    <!-- ============ CONTACTS ============ -->
+    <section class="page" id="page-contacts">
+      <div class="card">
+        <div class="card-title">All Contacts</div>
+        <div class="search-row">
+          <input type="text" id="searchContacts" placeholder="Search name or number..." oninput="renderContacts()">
+          <button class="btn ghost sm" onclick="loadChats()">&#8635; Refresh</button>
+        </div>
+        <div id="manualContactRow" style="display:none;" class="row" style="margin-bottom:12px;">
+          <input type="text" id="manualNumber" placeholder="Number with country code">
+          <input type="text" id="manualName" placeholder="Name (optional)" style="flex:1;">
+          <button class="btn sm" onclick="addManualContact()">Add</button>
+        </div>
+        <div class="row wrap" style="margin-bottom:12px;">
+          <label class="chip" style="cursor:pointer;">
+            <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" style="width:16px;height:16px;accent-color:var(--accent);"> Select all
+          </label>
+          <span class="hint" id="contactsHint" style="margin:0;"></span>
+        </div>
+        <div class="contact-list" id="contactsBox">
+          <div class="empty">Connect WhatsApp to load contacts...</div>
+        </div>
+        <div class="bulk-bar" id="bulkBar">
+          <div class="bulk-count"><span id="selectedCount">0</span> selected <small>&bull; <span id="totalCount">0</span> total</small></div>
+          <div class="spacer" style="flex:1;"></div>
+          <button class="btn" onclick="goToSend()">Send to Selected &rarr;</button>
+          <button class="btn ghost sm" onclick="clearSelection()">Clear</button>
+        </div>
       </div>
-      <div class="hint">Shows ALL your WhatsApp contacts automatically after connecting.</div>
-    </div>
-    <div id="metaSetup" style="display:none;margin-top:12px;">
-      <div class="panel-title">Official connection - Meta WhatsApp Cloud API</div>
-      <div class="hint" style="margin-top:0;">You need: Meta Business account, WhatsApp Business number, access token, and a public HTTPS URL (ngrok, VPS or Koyeb) for the webhook. After saving, restart the app.</div>
-      <label>Access token (permanent - from Meta System User)</label>
-      <input id="metaToken" type="password" placeholder="EAAG...">
-      <label>Phone number ID</label>
-      <input id="metaPhoneId" placeholder="e.g. 123456789012345">
-      <label>Verify token (any secret string you choose)</label>
-      <input id="metaVerify" placeholder="e.g. mysecret123">
-      <label>API version</label>
-      <input id="metaVersion" placeholder="v23.0">
-      <label>Public base URL of this dashboard (e.g. https://yourname.ngrok-free.app)</label>
-      <input id="metaPublicUrl" placeholder="https://...">
-      <div class="row" style="margin-top:12px;">
-        <button class="btn" id="saveMetaBtn">Save Meta Settings</button>
-        <button class="btn ghost" id="metaTestBtn">Send Test Message</button>
-        <div id="metaMsg" class="msg" style="align-self:center;"></div>
+    </section>
+
+    <!-- ============ SEND ============ -->
+    <section class="page" id="page-send">
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">Bulk Message</div>
+          <div class="chip" id="sendChip" style="margin-bottom:12px;">0 recipients selected</div>
+          <label class="f">Message</label>
+          <textarea id="bulkMsg" placeholder="Hello! This is an automated message..."></textarea>
+          <label class="f">Attach media (optional)</label>
+          <select id="bulkMedia"><option value="">No media</option></select>
+          <div class="row" style="margin-top:14px;">
+            <button class="btn" id="bulkBtn" onclick="startBulk()">&#10148; Send to <span id="selectedCount2">0</span></button>
+            <button class="btn ghost" onclick="go('contacts')">&#43; Choose contacts</button>
+          </div>
+          <div class="progress" id="bulkProgress"><div id="bulkBarInner"></div></div>
+          <div class="bulk-status" id="bulkInfo">No bulk send running.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Auto-Reply (Away Mode)</div>
+          <div class="row" style="justify-content:space-between;margin-bottom:8px;">
+            <span style="font-weight:700;font-size:14px;">Auto-reply when away</span>
+            <label class="toggle"><input type="checkbox" id="autoReplyToggle"><span class="sl"></span></label>
+          </div>
+          <label class="f">Auto-reply message</label>
+          <textarea id="autoReplyMsg" rows="2">I'm currently away and can't reply right now. I will get back to you as soon as possible.</textarea>
+          <label class="f">Attach media (optional)</label>
+          <select id="autoReplyMedia"><option value="">No media</option></select>
+          <button class="btn sm" style="margin-top:14px;" onclick="saveAutoReply()">Save Auto-Reply</button>
+        </div>
       </div>
-      <div id="metaTestRow" style="display:none;margin-top:10px;">
-        <label>Test number (with country code)</label>
-        <input id="metaTestNumber" placeholder="e.g. 919876543210">
-        <label>Test message</label>
-        <input id="metaTestMessage" placeholder="Hello from Arynox!">
+    </section>
+
+    <!-- ============ AI & BUSINESS ============ -->
+    <section class="page" id="page-ai">
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">Business Profile</div>
+          <label class="f">Business name</label>
+          <input type="text" id="bizName" placeholder="e.g. Arynox Tech Solutions">
+          <label class="f">What does your business do? (products, prices, hours)</label>
+          <textarea id="bizDesc" rows="3" placeholder="Describe your business, what you sell, prices, delivery info, timings..."></textarea>
+          <label class="f">Tone &amp; style</label>
+          <input type="text" id="bizTone" placeholder="e.g. Professional but friendly, Hindi/English mix">
+          <label class="f">Rules for the AI</label>
+          <textarea id="bizRules" rows="2" placeholder="e.g. Always greet, confirm orders, never promise discounts..."></textarea>
+          <button class="btn sm" style="margin-top:14px;" onclick="saveBiz()">Save Business Profile</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">AI Engine <span class="chip" style="margin-left:auto;">Groq</span></div>
+          <div class="hint" id="aiInfo" style="margin-top:0;"></div>
+          <label class="f">Ask the AI to test it</label>
+          <input type="text" id="aiQuestion" placeholder="e.g. What do you sell?" onkeydown="if(event.key==='Enter')testAI()">
+          <div class="row" style="margin-top:12px;">
+            <button class="btn sm" onclick="testAI()">&#9654; Test AI (live Groq)</button>
+          </div>
+          <div class="ai-reply-box" id="aiReply" style="margin-top:12px;">AI reply will appear here...</div>
+        </div>
+
+        <div class="card full" style="grid-column:1/-1;">
+          <div class="card-title">Knowledge Base <span class="chip">PDF &bull; TXT &bull; MD</span></div>
+          <div class="row wrap">
+            <input type="file" id="kbFile" accept=".pdf,.txt,.md" style="flex:1;min-width:200px;">
+            <button class="btn sm" onclick="uploadAndAddToKB()">Upload &amp; Add to AI Knowledge</button>
+          </div>
+          <div id="kbDocs" style="margin-top:14px;"></div>
+          <div class="hint">Upload menu, price list, catalog, policies... The AI reads them when answering customers.</div>
+        </div>
       </div>
-      <div id="webhookInfo" class="hint" style="background:#0f172a;border-radius:8px;padding:10px;margin-top:12px;"></div>
-    </div>
-  </div>
+    </section>
 
-  <div class="card">
-    <h2>Statistics</h2>
-    <div class="stats">
-      <div class="stat"><div class="label">Status</div><div class="value" id="statStatus">-</div></div>
-      <div class="stat"><div class="label">Phone Number</div><div class="value" id="statPhone" style="font-size:16px;">-</div></div>
-      <div class="stat"><div class="label">Messages Received</div><div class="value" id="statReceived">0</div></div>
-      <div class="stat"><div class="label">Messages Sent</div><div class="value" id="statSent">0</div></div>
-      <div class="stat"><div class="label">Uptime</div><div class="value" id="statUptime">0s</div></div>
-      <div class="stat"><div class="label">Media / Knowledge</div><div class="value" id="statMedia" style="font-size:16px;">0 / 0</div></div>
-    </div>
-  </div>
+    <!-- ============ MEDIA ============ -->
+    <section class="page" id="page-media">
+      <div class="card">
+        <div class="card-title">Media Library <span class="chip">images &bull; videos &bull; docs</span></div>
+        <div class="row wrap">
+          <input type="file" id="mediaFile" accept=".jpg,.jpeg,.png,.webp,.gif,.mp4,.mkv,.webm,.mov,.pdf" style="flex:1;min-width:200px;">
+          <button class="btn sm" onclick="uploadMedia()">Upload</button>
+        </div>
+        <div id="mediaGrid" class="media-grid" style="margin-top:16px;"></div>
+        <div class="hint">Give each media a note (e.g. "Product photo - blue shirt") so the AI knows when to send it. The AI can attach media automatically in replies.</div>
+      </div>
+    </section>
 
-  <div class="card full">
-    <h2>Business Profile (teaches the AI your business)</h2>
-    <label>Business name</label>
-    <input id="bizName" placeholder="e.g. Arynox Tech Solutions">
-    <label>What does your business do? (products, services, prices, working hours)</label>
-    <textarea id="bizDesc" rows="3" placeholder="Describe your business, what you sell, prices, delivery info, timings..."></textarea>
-    <label>Tone &amp; style</label>
-    <input id="bizTone" placeholder="e.g. Professional but friendly, use Hindi/English mix">
-    <label>Rules for the AI (what kind of messages to send, what to avoid)</label>
-    <textarea id="bizRules" rows="2" placeholder="e.g. Always greet customers, confirm orders, share menu when asked, never promise discounts..."></textarea>
-    <div class="row" style="margin-top:12px;">
-      <button class="btn" id="saveBiz">Save Business Profile</button>
-      <div id="bizMsg" class="msg" style="align-self:center;"></div>
-    </div>
-    <div class="hint">The AI uses this profile + your documents below to reply to customers like your business representative.</div>
   </div>
+</div>
 
-  <div class="card full">
-    <h2>Knowledge Base (RAG) &mdash; give the AI your PDFs &amp; documents</h2>
-    <div class="row">
-      <input type="file" id="kbFile" accept=".pdf,.txt,.md">
-      <button class="btn" onclick="uploadAndAddToKB()">Upload &amp; Add to AI Knowledge</button>
-    </div>
-    <div id="kbMsg" class="msg"></div>
-    <div id="kbDocs" style="margin-top:12px;"></div>
-    <div class="hint">Upload your menu, price list, product catalog, policies, brochures... The AI reads them when answering customers.</div>
-  </div>
+<!-- Mobile bottom nav -->
+<nav class="mobile-nav">
+  <button class="mn-item active" data-page="overview" onclick="go('overview')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    Home
+  </button>
+  <button class="mn-item" data-page="contacts" onclick="go('contacts')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+    Contacts
+  </button>
+  <button class="mn-item" data-page="send" onclick="go('send')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+    Send
+  </button>
+  <button class="mn-item" data-page="ai" onclick="go('ai')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/><path d="M5.6 5.6l2.1 2.1"/><path d="M16.3 16.3l2.1 2.1"/></svg>
+    AI
+  </button>
+  <button class="mn-item" data-page="media" onclick="go('media')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>
+    Media
+  </button>
+</nav>
 
-  <div class="card full">
-    <h2>Media Library (images / videos to send)</h2>
-    <div class="row">
-      <input type="file" id="mediaFile" accept=".jpg,.jpeg,.png,.webp,.gif,.mp4,.mkv,.webm,.mov,.pdf">
-      <button class="btn" onclick="uploadMedia()">Upload Image / Video</button>
-    </div>
-    <div id="mediaMsg" class="msg"></div>
-    <div id="mediaGrid" class="media-grid" style="margin-top:12px;"></div>
-    <div class="hint">Give each media a note (e.g. "Product photo - blue shirt") so the AI knows when to send it. The AI can attach media automatically in replies.</div>
-  </div>
-
-  <div class="card full">
-    <h2>Auto-Reply Mode (Away)</h2>
-    <div class="toggle-row">
-      <span class="lbl">When I'm away, automatically reply to every message</span>
-      <label class="switch">
-        <input type="checkbox" id="autoReplyToggle">
-        <span class="slider"></span>
-      </label>
-    </div>
-    <label>Auto-reply message</label>
-    <textarea id="autoReplyMsg" rows="2">I'm currently away and can't reply right now. I will get back to you as soon as possible.</textarea>
-    <label>Attach media with auto-reply (optional)</label>
-    <select id="autoReplyMedia"><option value="">No media</option></select>
-    <div class="row" style="margin-top:12px;">
-      <button class="btn" id="saveAutoReply">Save Auto-Reply</button>
-      <div id="autoReplyMsgBox" class="msg" style="align-self:center;"></div>
-    </div>
-  </div>
-
-  <div class="card full">
-    <h2>Contacts <span class="count-badge" id="contactCount">0 loaded</span></h2>
-    <div id="manualContactRow" style="display:none;" class="row" style="margin-bottom:12px;">
-      <input id="manualNumber" placeholder="Number with country code (e.g. 919876543210)">
-      <input id="manualName" placeholder="Name (optional)">
-      <button class="btn small" onclick="addManualContact()">Add</button>
-    </div>
-    <div class="contacts-tools">
-      <input id="searchContacts" placeholder="Search name or number...">
-      <label style="display:flex;align-items:center;gap:8px;white-space:nowrap;">
-        <input type="checkbox" id="selectAll" style="width:16px;height:16px;flex:none;"> Select all
-      </label>
-      <button class="btn small ghost" onclick="loadChats()">Refresh</button>
-    </div>
-    <div id="contactsBox">
-      <div style="color:#64748b;font-size:13px;padding:10px;text-align:center;">Connect WhatsApp to load contacts...</div>
-    </div>
-    <div class="hint" id="contactsHint">Shows ALL your WhatsApp contacts when connected. Search, select, then send below.</div>
-  </div>
-
-  <div class="card full">
-    <h2>Bulk Messaging</h2>
-    <label>Message to send to all selected contacts</label>
-    <textarea id="bulkMsg" rows="3" placeholder="Hello! This is an automated message..."></textarea>
-    <label>Attach media (image / video / PDF) - optional</label>
-    <select id="bulkMedia"><option value="">No media</option></select>
-    <div class="row" style="margin-top:12px;">
-      <button class="btn" id="bulkBtn">Send to Selected (<span id="selectedCount">0</span>)</button>
-      <div id="bulkMsgBox" class="msg" style="align-self:center;"></div>
-    </div>
-    <div class="bar-outer"><div class="bar-inner" id="bulkBar"></div></div>
-    <div class="bulk-info" id="bulkInfo">No bulk send running.</div>
-  </div>
-
-  <div class="card full">
-    <h2>Live Log</h2>
-    <div id="logBox"></div>
-  </div>
-</main>
+<div id="toasts"></div>
 
 <script>
 let state = null;
 let chats = [];
 let media = [];
+const selected = new Set();
+const PAGE_TITLES = { overview: 'Overview', contacts: 'Contacts', send: 'Send Messages', ai: 'AI & Business', media: 'Media Library' };
 
-function setPill(status) {
-  const pill = document.getElementById('statusPill');
+function toast(msg, type) {
+  const box = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = 'toast' + (type === 'error' ? ' err' : type === 'info' ? ' info' : '');
+  t.textContent = msg;
+  box.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+function esc(t) {
+  return String(t == null ? '' : t).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function go(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('[data-page]').forEach(b => b.classList.toggle('active', b.getAttribute('data-page') === page));
+  document.getElementById('page-' + page).classList.add('active');
+  document.getElementById('pageTitle').textContent = PAGE_TITLES[page] || page;
+  if (page === 'contacts' && chats.length === 0 && state && state.status === 'ready') loadChats();
+  if (page === 'media' && media.length === 0) loadMedia();
+  if (page === 'send') updateSendChip();
+  window.scrollTo({ top: 0 });
+}
+
+function goToSend() { updateSendChip(); go('send'); }
+
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('arynox-theme', next);
+}
+
+function avatarColor(id) {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+  return 'linear-gradient(135deg, hsl(' + h + ',65%,48%), hsl(' + ((h + 60) % 360) + ',65%,42%))';
+}
+
+function setStatus(status, backend, lastWebhook) {
+  const chip = document.getElementById('statusChip');
+  const dot = document.getElementById('statusDot');
   const text = document.getElementById('statusText');
-  pill.className = 'status-pill';
-  const map = { ready: ['ready', 'CONNECTED'], qr: ['qr', 'SCAN QR CODE'], authenticated: ['qr', 'AUTHENTICATED'], starting: ['', 'STARTING...'], disconnected: ['', 'DISCONNECTED'], error: ['error', 'ERROR'], config: ['qr', 'SETUP NEEDED'] };
+  dot.className = 'dot';
+  const map = {
+    ready: ['on', backend === 'meta' ? 'OFFICIAL &middot; Connected' : 'CONNECTED'],
+    qr: ['warn', backend === 'meta' ? 'OFFICIAL &middot; Awaiting webhook' : 'SCAN QR CODE'],
+    config: ['warn', 'SETUP NEEDED'],
+    starting: ['', 'STARTING...'],
+    disconnected: ['', 'DISCONNECTED'],
+    error: ['err', 'ERROR'],
+  };
   const arr = map[status] || ['', status];
-  pill.classList.add(arr[0]);
-  text.textContent = arr[1];
+  dot.classList.add(arr[0]);
+  text.innerHTML = arr[1];
+}
+
+function refresh() {
+  fetch('/api/status').then(r => r.json()).then(d => {
+    state = d;
+    setStatus(d.status, d.backend, d.meta && d.meta.lastWebhookAt);
+    document.getElementById('statStatus').textContent = d.status;
+    document.getElementById('statPhone').textContent = d.phone || '-';
+    document.getElementById('statReceived').textContent = d.messageCount;
+    document.getElementById('statSent').textContent = d.sentCount;
+    document.getElementById('statUptime').textContent = fmtUptime(d.uptime || 0);
+    document.getElementById('statMedia').textContent = (d.mediaCount || 0) + ' / ' + (d.knowledgeDocs ? d.knowledgeDocs.length : 0);
+    updateBackendUI();
+
+    if (d.autoReply) {
+      document.getElementById('autoReplyToggle').checked = d.autoReply.enabled;
+      if (d.autoReply.message) document.getElementById('autoReplyMsg').value = d.autoReply.message;
+    }
+    if (d.business) {
+      document.getElementById('bizName').value = d.business.businessName || '';
+      document.getElementById('bizDesc').value = d.business.businessDescription || '';
+      document.getElementById('bizTone').value = d.business.tone || '';
+      document.getElementById('bizRules').value = d.business.rules || '';
+    }
+    if (d.ai) {
+      document.getElementById('aiInfo').textContent = 'Primary: Groq (' + d.ai.model + ') &middot; Fallback: OpenCode Zen (' + d.ai.fallbackModel + ') &middot; Keys: Groq ' + (d.ai.groqKeyConfigured ? 'OK' : 'MISSING') + ' / OpenCode ' + (d.ai.opencodeKeyConfigured ? 'OK' : 'MISSING') + '. Both are in .env.';
+      document.getElementById('aiInfo').innerHTML = 'Primary: <b>Groq</b> (<code>' + esc(d.ai.model) + '</code>) &middot; Fallback: <b>OpenCode Zen</b> (<code>' + esc(d.ai.fallbackModel) + '</code>)<br>Keys: Groq ' + (d.ai.groqKeyConfigured ? '<span style="color:var(--accent)">&#10003; configured</span>' : '<span style="color:var(--danger)">missing</span>') + ' &middot; OpenCode ' + (d.ai.opencodeKeyConfigured ? '<span style="color:var(--accent)">&#10003; configured</span>' : '<span style="color:var(--danger)">missing</span>') + ' &mdash; set them in .env';
+    }
+    renderKbDocs(d.knowledgeDocs || []);
+
+    if (d.bulk && d.bulk.active) {
+      const pct = d.bulk.total ? Math.round(d.bulk.sent / d.bulk.total * 100) : 0;
+      document.getElementById('bulkBarInner').style.width = pct + '%';
+      document.getElementById('bulkInfo').textContent = 'Sending: ' + d.bulk.current + ' | ' + d.bulk.sent + '/' + d.bulk.total + ' sent, ' + d.bulk.failed + ' failed';
+      document.getElementById('bulkBtn').disabled = true;
+    } else {
+      document.getElementById('bulkBtn').disabled = false;
+      if (d.bulk && d.bulk.status === 'done') {
+        document.getElementById('bulkInfo').textContent = 'Done: ' + d.bulk.sent + ' sent, ' + d.bulk.failed + ' failed';
+        document.getElementById('bulkBarInner').style.width = '100%';
+        setTimeout(() => { document.getElementById('bulkBarInner').style.width = '0%'; }, 6000);
+      }
+    }
+
+    renderQr(d.hasQr);
+    const box = document.getElementById('logBox');
+    box.innerHTML = (d.log || []).map(l => '<div>' + esc(l) + '</div>').join('');
+    box.scrollTop = box.scrollHeight;
+
+    if (d.status === 'ready' && chats.length === 0 && d.backend !== 'meta') loadChats();
+  }).catch(() => {
+    document.getElementById('statusText').textContent = 'SERVER OFFLINE';
+  });
+}
+
+function fmtUptime(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return (h ? h + 'h ' : '') + (m ? m + 'm ' : '') + sec + 's';
+}
+
+function renderQr(hasQr) {
+  const img = document.getElementById('qrImg');
+  const ph = document.getElementById('qrPlaceholder');
+  if (hasQr) {
+    fetch('/api/qr').then(r => r.json()).then(d => {
+      if (d.qr) {
+        img.src = d.qr;
+        img.style.display = 'block';
+        ph.style.display = 'none';
+        document.getElementById('qrHint').textContent = 'Scan this QR code with your WhatsApp';
+      }
+    });
+  } else {
+    img.style.display = 'none';
+    ph.style.display = 'flex';
+    ph.innerHTML = (state && state.status === 'ready') ? '&#10003; Connected to WhatsApp' : 'Waiting for QR code...';
+    document.getElementById('qrHint').innerHTML = (state && state.status === 'ready')
+      ? 'Bot is connected. All contacts load automatically.'
+      : 'Open WhatsApp &rarr; Linked Devices &rarr; Link a Device';
+  }
 }
 
 function updateBackendUI() {
   const isMeta = state && state.backend === 'meta';
-  document.getElementById('backendSelect').value = isMeta ? 'meta' : 'baileys';
   document.getElementById('tile-baileys').classList.toggle('active', !isMeta);
   document.getElementById('tile-meta').classList.toggle('active', isMeta);
-  document.getElementById('metaSetup').style.display = isMeta ? 'block' : 'none';
   document.getElementById('qrPanel').style.display = isMeta ? 'none' : 'block';
+  document.getElementById('metaPanel').style.display = isMeta ? 'block' : 'none';
   document.getElementById('manualContactRow').style.display = isMeta ? 'flex' : 'none';
-  const qrWrap = document.getElementById('qrWrap');
-  if (isMeta) {
-    qrWrap.style.display = 'none';
-    document.getElementById('contactsHint').textContent = 'Customers who message the bot appear here automatically. You can also add numbers manually above.';
-  } else {
-    qrWrap.style.display = 'flex';
-    document.getElementById('contactsHint').textContent = 'Shows ALL your WhatsApp contacts when connected. Search, select, then send below.';
-  }
+  document.getElementById('contactsHint').innerHTML = isMeta
+    ? 'Customers who message the bot appear here automatically. You can also add numbers manually above.'
+    : 'All WhatsApp contacts appear here. Search, select, then send.';
+
   if (isMeta && state.meta) {
     document.getElementById('metaToken').value = state.meta.token || '';
     document.getElementById('metaPhoneId').value = state.meta.phoneNumberId || '';
@@ -298,106 +715,88 @@ function updateBackendUI() {
     document.getElementById('metaPublicUrl').value = state.meta.publicUrl || '';
     const wh = document.getElementById('webhookInfo');
     if (state.meta.configured) {
-      const url = (state.meta.publicUrl ? state.meta.publicUrl + '/webhook' : '/webhook (set your public URL above)');
-      wh.innerHTML = '<b>Webhook status: configured</b><br>Configure this URL in Meta: <b>' + esc(url) + '</b><br>' +
-        'Verify token: <b>' + esc(state.meta.verifyToken) + '</b>' +
-        (state.meta.lastWebhookAt ? '<br>Last webhook received: ' + new Date(state.meta.lastWebhookAt).toLocaleTimeString() : '<br>No webhook received yet') +
+      const url = state.meta.publicUrl ? state.meta.publicUrl + '/webhook' : '/webhook (set public URL above)';
+      wh.innerHTML = '<b style="color:var(--accent)">&#10003; Configured</b><br>Webhook URL for Meta: <code>' + esc(url) + '</code><br>Verify token: <code>' + esc(state.meta.verifyToken) + '</code>' +
+        (state.meta.lastWebhookAt ? '<br>Last webhook: ' + new Date(state.meta.lastWebhookAt).toLocaleTimeString() : '<br>No webhook received yet') +
         '<br>Customers seen: ' + state.meta.contacts;
     } else {
-      wh.innerHTML = '<b style="color:#f87171;">Not configured yet.</b> Fill in token, phone number ID and verify token, save, restart, then verify the webhook in Meta.';
+      wh.innerHTML = '<b style="color:var(--danger)">Not configured yet.</b> Fill all fields, save, restart the app, then verify the webhook in Meta.';
     }
   }
 }
 
-function renderQr(hasQr) {
-  const img = document.getElementById('qrImg');
-  if (hasQr) {
-    fetch('/api/qr').then(r => r.json()).then(data => {
-      if (data.qr) {
-        img.src = data.qr;
-        img.classList.remove('placeholder');
-        document.getElementById('qrHint').textContent = 'Scan this QR code with your WhatsApp';
-      }
-    });
-  } else {
-    img.removeAttribute('src');
-    img.classList.add('placeholder');
-    img.innerHTML = (state && state.status === 'ready') ? '&#10003; Connected' : 'No QR code available';
-    document.getElementById('qrHint').textContent = (state && state.status === 'ready')
-      ? 'Bot is connected to WhatsApp'
-      : 'Waiting for QR code... Open WhatsApp &rarr; Linked Devices &rarr; Link a Device';
-  }
+function setBackend(b) {
+  const tile = b === 'meta' ? document.getElementById('tile-meta') : document.getElementById('tile-baileys');
+  document.getElementById('tile-baileys').classList.toggle('active', b === 'baileys');
+  document.getElementById('tile-meta').classList.toggle('active', b === 'meta');
+  document.getElementById('qrPanel').style.display = b === 'meta' ? 'none' : 'block';
+  document.getElementById('metaPanel').style.display = b === 'meta' ? 'block' : 'none';
+  if (b === 'meta') toast('Official Meta setup shown. Save settings, then restart the app to apply.', 'info');
 }
 
-function fmtUptime(s) {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  return (h ? h + 'h ' : '') + (m ? m + 'm ' : '') + sec + 's';
+async function resetQr() {
+  try {
+    const r = await fetch('/api/qr/reset', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) toast('Session deleted - new QR code appearing...');
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
-function esc(t) {
-  return String(t == null ? '' : t).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+async function saveMeta() {
+  const body = {
+    backend: 'meta',
+    token: document.getElementById('metaToken').value,
+    phoneNumberId: document.getElementById('metaPhoneId').value,
+    verifyToken: document.getElementById('metaVerify').value,
+    apiVersion: document.getElementById('metaVersion').value || 'v23.0',
+    publicUrl: document.getElementById('metaPublicUrl').value,
+  };
+  try {
+    const r = await fetch('/api/meta/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.ok) toast(d.configured ? 'Meta settings saved and configured! Restart the app to apply.' : 'Saved. Fill all fields to configure. Restart to apply.');
+    else toast(d.error || 'Failed', 'error');
+    refresh();
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
-function refresh() {
-  fetch('/api/status').then(r => r.json()).then(data => {
-    state = data;
-    setPill(data.status);
-    document.getElementById('statStatus').textContent = data.status;
-    document.getElementById('statPhone').textContent = data.phone || '-';
-    document.getElementById('statReceived').textContent = data.messageCount;
-    document.getElementById('statSent').textContent = data.sentCount;
-    document.getElementById('statUptime').textContent = fmtUptime(data.uptime || 0);
-    document.getElementById('statMedia').textContent = (data.mediaCount || 0) + ' / ' + (data.knowledgeDocs ? data.knowledgeDocs.length : 0);
-    renderQr(data.hasQr);
-    updateBackendUI();
-
-    if (data.autoReply) {
-      document.getElementById('autoReplyToggle').checked = data.autoReply.enabled;
-      if (data.autoReply.message) document.getElementById('autoReplyMsg').value = data.autoReply.message;
-    }
-    if (data.business) {
-      document.getElementById('bizName').value = data.business.businessName || '';
-      document.getElementById('bizDesc').value = data.business.businessDescription || '';
-      document.getElementById('bizTone').value = data.business.tone || '';
-      document.getElementById('bizRules').value = data.business.rules || '';
-    }
-    renderKbDocs(data.knowledgeDocs || []);
-
-    if (data.bulk && data.bulk.active) {
-      const pct = data.bulk.total ? Math.round(data.bulk.sent / data.bulk.total * 100) : 0;
-      document.getElementById('bulkBar').style.width = pct + '%';
-      document.getElementById('bulkInfo').textContent = 'Sending: ' + esc(data.bulk.current) + ' | ' + data.bulk.sent + '/' + data.bulk.total + ' sent, ' + data.bulk.failed + ' failed';
-      document.getElementById('bulkBtn').disabled = true;
-    } else {
-      document.getElementById('bulkBtn').disabled = false;
-      if (data.bulk && data.bulk.status === 'done') {
-        document.getElementById('bulkInfo').textContent = 'Done: ' + data.bulk.sent + ' sent, ' + data.bulk.failed + ' failed';
-      }
-    }
-
-    const box = document.getElementById('logBox');
-    box.innerHTML = (data.log || []).map(l => '<div>' + esc(l) + '</div>').join('');
-    box.scrollTop = box.scrollHeight;
-
-    if (data.status === 'ready' && chats.length === 0) loadChats();
-  }).catch(() => {
-    document.getElementById('statusText').textContent = 'SERVER OFFLINE';
-  });
+function toggleMetaTest() {
+  document.getElementById('metaTestRow').style.display = document.getElementById('metaTestRow').style.display === 'none' ? 'block' : 'none';
 }
 
+async function sendMetaTest() {
+  const body = {
+    to: document.getElementById('metaTestNumber').value,
+    message: document.getElementById('metaTestMessage').value || 'Test message from Arynox',
+  };
+  try {
+    const r = await fetch('/api/meta/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.ok) toast('Test message sent!');
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
+}
+
+/* ---------------- Contacts ---------------- */
 async function loadChats() {
   try {
-    const res = await fetch('/api/chats');
-    const data = await res.json();
-    if (data.ok) {
-      chats = data.chats;
-      document.getElementById('contactCount').textContent = chats.length + ' loaded';
+    const r = await fetch('/api/chats');
+    const d = await r.json();
+    if (d.ok) {
+      chats = d.chats;
+      document.getElementById('totalCount').textContent = chats.length;
+      selected.clear();
       renderContacts();
+      updateSendChip();
+      document.getElementById('navContactBadge').textContent = chats.length;
+      document.getElementById('navContactBadge').style.display = chats.length ? 'inline-block' : 'none';
+      if (chats.length) toast('Loaded ' + chats.length + ' contacts');
     } else {
-      document.getElementById('contactsBox').innerHTML = '<div style="color:#f87171;font-size:13px;padding:10px;text-align:center;">' + esc(data.error || 'Failed to load') + '</div>';
+      document.getElementById('contactsBox').innerHTML = '<div class="empty">' + esc(d.error || 'Failed to load') + '</div>';
     }
   } catch (e) {
-    document.getElementById('contactsBox').innerHTML = '<div style="color:#f87171;font-size:13px;padding:10px;text-align:center;">Failed to load contacts</div>';
+    document.getElementById('contactsBox').innerHTML = '<div class="empty">Failed to load contacts</div>';
   }
 }
 
@@ -405,108 +804,201 @@ function renderContacts() {
   const q = document.getElementById('searchContacts').value.toLowerCase();
   const filtered = chats.filter(c => (c.name || '').toLowerCase().includes(q) || (c.number || '').includes(q));
   const box = document.getElementById('contactsBox');
-  if (filtered.length === 0) {
-    box.innerHTML = '<div style="color:#64748b;font-size:13px;padding:10px;text-align:center;">No contacts found.</div>';
+  if (chats.length === 0) {
+    box.innerHTML = '<div class="empty">Connect WhatsApp first. Contacts load automatically after scanning the QR code.</div>';
     return;
   }
-  const selected = new Set(getSelected());
+  if (filtered.length === 0) {
+    box.innerHTML = '<div class="empty">No contacts match "' + esc(q) + '"</div>';
+    return;
+  }
   box.innerHTML = filtered.map(c => {
-    const checked = selected.has(c.id) ? 'checked' : '';
-    return '<div class="contact-item" onclick="toggleContact(event, \'' + c.id + '\')">' +
-      '<input type="checkbox" data-id="' + c.id + '" ' + checked + '>' +
-      '<div style="flex:1;"><div class="c-name">' + esc(c.name || c.number) + '</div>' +
-      '<div class="c-num">' + esc(c.number) + '</div></div></div>';
+    const sel = selected.has(c.id) ? ' selected' : '';
+    return '<div class="contact' + sel + '" onclick="toggleContact(\'' + c.id + '\')">' +
+      '<div class="avatar" style="background:' + avatarColor(c.id) + ';">' + esc((c.name || '?').charAt(0).toUpperCase()) + '</div>' +
+      '<div class="c-info"><div class="c-name">' + esc(c.name || c.number) + '</div><div class="c-num">' + esc(c.number) + '</div></div>' +
+      '<div class="check">&#10003;</div></div>';
   }).join('');
   updateSelectedCount();
+  document.getElementById('selectAll').checked = selected.size === chats.length && chats.length > 0;
 }
 
-function getSelected() {
-  return Array.from(document.querySelectorAll('#contactsBox input[type=checkbox]:checked')).map(i => i.getAttribute('data-id'));
+function toggleContact(id) {
+  if (selected.has(id)) selected.delete(id); else selected.add(id);
+  renderContacts();
+  updateSendChip();
 }
 
-function toggleContact(e, id) {
-  e.stopPropagation();
-  const cb = document.querySelector('#contactsBox input[data-id="' + id + '"]');
-  if (cb) { cb.checked = !cb.checked; updateSelectedCount(); }
+function toggleSelectAll(cb) {
+  if (cb.checked) chats.forEach(c => selected.add(c.id));
+  else selected.clear();
+  renderContacts();
+  updateSendChip();
 }
+
+function clearSelection() { selected.clear(); renderContacts(); updateSendChip(); toast('Selection cleared'); }
 
 function updateSelectedCount() {
-  document.getElementById('selectedCount').textContent = getSelected().length;
+  document.getElementById('selectedCount').textContent = selected.size;
+  document.getElementById('selectedCount2').textContent = selected.size;
+  document.getElementById('sendChip').innerHTML = selected.size + ' recipient' + (selected.size === 1 ? '' : 's') + ' selected &middot; <a href="#" onclick="go(\'contacts\');return false;" style="color:var(--accent);">change</a>';
 }
 
-document.getElementById('searchContacts').addEventListener('input', renderContacts);
+function updateSendChip() { updateSelectedCount(); }
 
-document.getElementById('selectAll').addEventListener('change', e => {
-  document.querySelectorAll('#contactsBox input[type=checkbox]').forEach(cb => cb.checked = e.target.checked);
-  updateSelectedCount();
-});
+async function addManualContact() {
+  const num = document.getElementById('manualNumber').value.trim();
+  const name = document.getElementById('manualName').value.trim();
+  if (!num) { toast('Enter a number', 'error'); return; }
+  try {
+    const r = await fetch('/api/contacts/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ number: num, name }) });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('manualNumber').value = '';
+      document.getElementById('manualName').value = '';
+      toast('Contact added');
+      loadChats();
+    } else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
+}
 
-document.getElementById('saveBiz').addEventListener('click', async () => {
+/* ---------------- Send ---------------- */
+async function startBulk() {
+  const msg = document.getElementById('bulkMsg').value.trim();
+  const m = document.getElementById('bulkMedia');
+  if (!msg) { toast('Enter a message first', 'error'); return; }
+  if (selected.size === 0) { toast('Select at least one contact', 'error'); return; }
+  const numbers = Array.from(selected).map(id => id.split('@')[0].replace(/[^0-9]/g, ''));
+  toast('Starting bulk send to ' + numbers.length + ' contacts...');
+  try {
+    const r = await fetch('/api/bulk-send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ numbers, message: msg, mediaId: m.value }) });
+    const d = await r.json();
+    if (!d.ok) toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
+}
+
+async function saveAutoReply() {
+  const body = {
+    enabled: document.getElementById('autoReplyToggle').checked,
+    message: document.getElementById('autoReplyMsg').value,
+    mediaId: document.getElementById('autoReplyMedia').value,
+  };
+  try {
+    const r = await fetch('/api/auto-reply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.ok) toast('Auto-reply ' + (d.autoReply.enabled ? 'enabled' : 'disabled'));
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
+}
+
+/* ---------------- AI & Business ---------------- */
+async function saveBiz() {
   const body = {
     businessName: document.getElementById('bizName').value.trim(),
     businessDescription: document.getElementById('bizDesc').value.trim(),
     tone: document.getElementById('bizTone').value.trim(),
     rules: document.getElementById('bizRules').value.trim(),
   };
-  const m = document.getElementById('bizMsg');
-  m.className = 'msg';
-  m.textContent = 'Saving...';
   try {
-    const res = await fetch('/api/business', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const data = await res.json();
-    m.className = 'msg' + (data.ok ? '' : ' err');
-    m.textContent = data.ok ? 'Business profile saved - AI now knows your business!' : (data.error || 'Failed');
-  } catch (e) { m.className = 'msg err'; m.textContent = 'Failed: ' + e.message; }
-});
+    const r = await fetch('/api/business', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.ok) toast('Business profile saved - AI now knows your business');
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
+}
 
-async function uploadMedia() {
-  const input = document.getElementById('mediaFile');
-  const m = document.getElementById('mediaMsg');
-  if (!input.files.length) { m.className = 'msg err'; m.textContent = 'Choose a file first'; return; }
-  m.className = 'msg';
-  m.textContent = 'Uploading...';
+async function testAI() {
+  const q = document.getElementById('aiQuestion').value.trim() || 'Say hello in one short friendly sentence';
+  const box = document.getElementById('aiReply');
+  box.innerHTML = '<span class="spin">&#8635;</span> Asking Groq...';
+  try {
+    const r = await fetch('/api/ai/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) });
+    const d = await r.json();
+    if (d.ok) box.textContent = d.reply;
+    else box.innerHTML = '<span style="color:var(--danger)">' + esc(d.error || 'Failed') + '</span>';
+  } catch (e) { box.innerHTML = '<span style="color:var(--danger)">Failed: ' + esc(e.message) + '</span>'; }
+}
+
+function renderKbDocs(docs) {
+  const box = document.getElementById('kbDocs');
+  if (!docs || docs.length === 0) {
+    box.innerHTML = '<div class="hint" style="margin:0;">No documents in knowledge base yet.</div>';
+    return;
+  }
+  box.innerHTML = docs.map(d =>
+    '<div class="doc-row"><span class="d-name">&#128196; ' + esc(d.name) + '</span>' +
+    '<button class="btn danger sm" onclick="deleteKbDoc(\'' + esc(d.name) + '\')">Remove</button></div>'
+  ).join('');
+}
+
+async function deleteKbDoc(name) {
+  if (!confirm('Remove ' + name + ' from AI knowledge?')) return;
+  await fetch('/api/kb/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+  toast('Removed from knowledge base');
+  refresh();
+}
+
+async function uploadAndAddToKB() {
+  const input = document.getElementById('kbFile');
+  if (!input.files.length) { toast('Choose a PDF/TXT/MD file first', 'error'); return; }
+  toast('Uploading...', 'info');
   const fd = new FormData();
   fd.append('file', input.files[0]);
   try {
-    const res = await fetch('/api/upload', { method: 'POST', body: fd });
-    const data = await res.json();
-    if (data.ok) { m.textContent = 'Uploaded: ' + data.fileName; loadMedia(); input.value = ''; }
-    else { m.className = 'msg err'; m.textContent = data.error || 'Failed'; }
-  } catch (e) { m.className = 'msg err'; m.textContent = 'Failed: ' + e.message; }
+    const r = await fetch('/api/upload', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!d.ok) { toast(d.error || 'Upload failed', 'error'); return; }
+    toast('Extracting text...', 'info');
+    const kb = await fetch('/api/kb/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: d.fileName }) });
+    const kd = await kb.json();
+    if (kd.ok) { toast('Added to AI knowledge: ' + d.fileName); input.value = ''; loadMedia(); refresh(); }
+    else toast(kd.error || 'Could not add to knowledge', 'error');
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
+}
+
+/* ---------------- Media ---------------- */
+async function uploadMedia() {
+  const input = document.getElementById('mediaFile');
+  if (!input.files.length) { toast('Choose a file first', 'error'); return; }
+  toast('Uploading...', 'info');
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  try {
+    const r = await fetch('/api/upload', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.ok) { toast('Uploaded: ' + d.fileName); loadMedia(); input.value = ''; }
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
 function renderMedia() {
   const grid = document.getElementById('mediaGrid');
   const autoSel = document.getElementById('autoReplyMedia');
   const bulkSel = document.getElementById('bulkMedia');
-  const autoCurrent = autoSel.value;
-  const bulkCurrent = bulkSel.value;
+  const autoCurrent = autoSel.value, bulkCurrent = bulkSel.value;
   autoSel.innerHTML = '<option value="">No media</option>';
   bulkSel.innerHTML = '<option value="">No media</option>';
+
   if (media.length === 0) {
-    grid.innerHTML = '<div style="grid-column:1/-1;color:#64748b;font-size:13px;text-align:center;padding:14px;">No media uploaded yet.</div>';
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No media uploaded yet. Upload images, videos or PDFs to send with messages.</div>';
   } else {
     grid.innerHTML = media.map(m => {
       const thumb = m.type === 'image'
         ? '<img class="m-thumb" src="' + m.url + '" alt="">'
-        : (m.type === 'video' ? '<div class="m-thumb">&#9654; video</div>' : '<div class="m-thumb">&#128196; document</div>');
-      const noteVal = m.note || '';
+        : (m.type === 'video' ? '<div class="m-thumb">&#9654; VIDEO</div>' : '<div class="m-thumb">&#128196; DOCUMENT</div>');
       return '<div class="media-item">' + thumb +
         '<div class="m-body"><div class="m-name">' + esc(m.fileName) + '</div>' +
-        '<div class="m-note"><input placeholder="Note for AI (what is this?)" value="' + esc(noteVal) + '" onchange="saveNote(\'' + esc(m.fileName) + '\', this.value)"></div></div>' +
-        '<div class="m-actions">' +
-        '<button class="btn danger" onclick="deleteMediaFile(\'' + esc(m.fileName) + '\')">Delete</button>' +
-        '</div></div>';
+        '<div class="m-note"><input placeholder="Note for AI (what is this?)" value="' + esc(m.note || '') + '" onchange="saveNote(\'' + esc(m.fileName) + '\', this.value)"></div></div>' +
+        '<div class="m-actions"><button class="btn danger" onclick="deleteMediaFile(\'' + esc(m.fileName) + '\')">Delete</button></div></div>';
     }).join('');
   }
   media.forEach(m => {
+    const label = (m.note ? m.note + ' - ' : '') + m.fileName;
     const o1 = document.createElement('option');
-    o1.value = m.fileName;
-    o1.textContent = (m.note ? m.note + ' - ' : '') + m.fileName;
+    o1.value = m.fileName; o1.textContent = label;
     autoSel.appendChild(o1);
     const o2 = document.createElement('option');
-    o2.value = m.fileName;
-    o2.textContent = (m.note ? m.note + ' - ' : '') + m.fileName;
+    o2.value = m.fileName; o2.textContent = label;
     bulkSel.appendChild(o2);
   });
   autoSel.value = autoCurrent;
@@ -515,9 +1007,9 @@ function renderMedia() {
 
 async function loadMedia() {
   try {
-    const res = await fetch('/api/media');
-    const data = await res.json();
-    if (data.ok) { media = data.media; renderMedia(); }
+    const r = await fetch('/api/media');
+    const d = await r.json();
+    if (d.ok) { media = d.media; renderMedia(); }
   } catch (e) { }
 }
 
@@ -529,174 +1021,14 @@ async function saveNote(fileName, note) {
 async function deleteMediaFile(fileName) {
   if (!confirm('Delete ' + fileName + '?')) return;
   await fetch('/api/media/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName }) });
+  toast('Media deleted');
   loadMedia();
-}
-
-async function uploadAndAddToKB() {
-  const input = document.getElementById('kbFile');
-  const m = document.getElementById('kbMsg');
-  if (!input.files.length) { m.className = 'msg err'; m.textContent = 'Choose a file first'; return; }
-  m.className = 'msg';
-  m.textContent = 'Uploading...';
-  const fd = new FormData();
-  fd.append('file', input.files[0]);
-  try {
-    const res = await fetch('/api/upload', { method: 'POST', body: fd });
-    const data = await res.json();
-    if (!data.ok) { m.className = 'msg err'; m.textContent = data.error || 'Upload failed'; return; }
-    m.textContent = 'Extracting text...';
-    const kb = await fetch('/api/kb/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileName: data.fileName }) });
-    const kd = await kb.json();
-    if (kd.ok) {
-      m.textContent = 'Added to AI knowledge: ' + data.fileName;
-      input.value = '';
-      loadMedia();
-      refresh();
-    } else {
-      m.className = 'msg err';
-      m.textContent = kd.error || 'Could not add to knowledge';
-    }
-  } catch (e) { m.className = 'msg err'; m.textContent = 'Failed: ' + e.message; }
-}
-
-function renderKbDocs(docs) {
-  const box = document.getElementById('kbDocs');
-  if (!docs.length) {
-    box.innerHTML = '<div style="color:#64748b;font-size:13px;">No documents in knowledge base yet.</div>';
-    return;
-  }
-  box.innerHTML = docs.map(d =>
-    '<div class="doc-row"><span class="d-name">' + esc(d.name) + '</span>' +
-    '<button class="btn danger small" onclick="deleteKbDoc(\'' + esc(d.name) + '\')">Remove</button></div>'
-  ).join('');
-}
-
-async function deleteKbDoc(name) {
-  if (!confirm('Remove ' + name + ' from AI knowledge?')) return;
-  await fetch('/api/kb/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
   refresh();
 }
 
-document.getElementById('saveAutoReply').addEventListener('click', async () => {
-  const body = {
-    enabled: document.getElementById('autoReplyToggle').checked,
-    message: document.getElementById('autoReplyMsg').value,
-    mediaId: document.getElementById('autoReplyMedia').value,
-  };
-  const m = document.getElementById('autoReplyMsgBox');
-  m.className = 'msg';
-  m.textContent = 'Saving...';
-  try {
-    const res = await fetch('/api/auto-reply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const data = await res.json();
-    m.className = 'msg' + (data.ok ? '' : ' err');
-    m.textContent = data.ok ? 'Auto-reply saved' : (data.error || 'Failed');
-  } catch (e) { m.className = 'msg err'; m.textContent = 'Failed: ' + e.message; }
-});
-
-document.getElementById('backendSelect').addEventListener('change', e => {
-  const msg = document.getElementById('metaMsg');
-  msg.className = 'msg';
-  msg.textContent = 'Backend switched to ' + (e.target.value === 'meta' ? 'Meta Cloud API' : 'Baileys') + '. Enter Meta settings below and click Save (a restart is required to apply).';
-});
-
-function setBackend(b) {
-  document.getElementById('backendSelect').value = b;
-  document.getElementById('backendSelect').dispatchEvent(new Event('change'));
-  updateBackendUI();
-}
-
-async function resetQr() {
-  const m = document.getElementById('qrResetMsg');
-  m.className = 'msg';
-  m.textContent = 'Resetting...';
-  try {
-    const res = await fetch('/api/qr/reset', { method: 'POST' });
-    const data = await res.json();
-    m.className = 'msg' + (data.ok ? '' : ' err');
-    m.textContent = data.ok ? 'Session deleted - scanning a new QR code in a moment...' : (data.error || 'Failed');
-  } catch (e) { m.className = 'msg err'; m.textContent = 'Failed: ' + e.message; }
-}
-
-document.getElementById('saveMetaBtn').addEventListener('click', async () => {
-  const body = {
-    backend: document.getElementById('backendSelect').value,
-    token: document.getElementById('metaToken').value,
-    phoneNumberId: document.getElementById('metaPhoneId').value,
-    verifyToken: document.getElementById('metaVerify').value,
-    apiVersion: document.getElementById('metaVersion').value || 'v23.0',
-    publicUrl: document.getElementById('metaPublicUrl').value,
-  };
-  const m = document.getElementById('metaMsg');
-  m.className = 'msg';
-  m.textContent = 'Saving...';
-  try {
-    const res = await fetch('/api/meta/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const data = await res.json();
-    m.className = 'msg' + (data.ok ? '' : ' err');
-    m.textContent = data.ok
-      ? 'Saved! Backend: ' + (data.backend === 'meta' ? 'Meta Cloud API' : 'Baileys') + (data.configured ? ' - configured' : ' - fill all fields to configure') + '. Restart the app to apply.'
-      : (data.error || 'Failed');
-    refresh();
-  } catch (e) { m.className = 'msg err'; m.textContent = 'Failed: ' + e.message; }
-});
-
-document.getElementById('metaTestBtn').addEventListener('click', () => {
-  const row = document.getElementById('metaTestRow');
-  row.style.display = row.style.display === 'none' ? 'block' : 'none';
-});
-
-document.getElementById('metaTestMessage').addEventListener('keydown', async e => {
-  if (e.key === 'Enter') await sendMetaTest();
-});
-
-async function sendMetaTest() {
-  const m = document.getElementById('metaMsg');
-  const body = {
-    to: document.getElementById('metaTestNumber').value,
-    message: document.getElementById('metaTestMessage').value || 'Test message from Arynox Automation',
-  };
-  m.className = 'msg';
-  m.textContent = 'Sending...';
-  try {
-    const res = await fetch('/api/meta/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    const data = await res.json();
-    m.className = 'msg' + (data.ok ? '' : ' err');
-    m.textContent = data.ok ? 'Test message sent!' : (data.error || 'Failed');
-  } catch (e) { m.className = 'msg err'; m.textContent = 'Failed: ' + e.message; }
-}
-
-async function addManualContact() {
-  const num = document.getElementById('manualNumber').value.trim();
-  const name = document.getElementById('manualName').value.trim();
-  if (!num) { alert('Enter a number'); return; }
-  const res = await fetch('/api/contacts/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ number: num, name }) });
-  const data = await res.json();
-  if (data.ok) {
-    document.getElementById('manualNumber').value = '';
-    document.getElementById('manualName').value = '';
-    loadChats();
-  } else {
-    alert(data.error || 'Failed');
-  }
-}
-
-document.getElementById('bulkBtn').addEventListener('click', async () => {
-  const msg = document.getElementById('bulkMsg').value.trim();
-  const ids = getSelected();
-  const m = document.getElementById('bulkMsgBox');
-  if (!msg) { m.className = 'msg err'; m.textContent = 'Enter a message first'; return; }
-  if (ids.length === 0) { m.className = 'msg err'; m.textContent = 'Select at least one contact'; return; }
-  const numbers = ids.map(id => id.split('@')[0].replace(/[^0-9]/g, ''));
-  m.className = 'msg';
-  m.textContent = 'Starting bulk send to ' + numbers.length + ' contacts...';
-  try {
-    const res = await fetch('/api/bulk-send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ numbers, message: msg, mediaId: document.getElementById('bulkMedia').value }) });
-    const data = await res.json();
-    m.className = 'msg' + (data.ok ? '' : ' err');
-    m.textContent = data.ok ? 'Bulk send started for ' + numbers.length + ' contacts' : (data.error || 'Failed');
-  } catch (e) { m.className = 'msg err'; m.textContent = 'Failed: ' + e.message; }
-});
+/* ---------------- Init ---------------- */
+const savedTheme = localStorage.getItem('arynox-theme');
+if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
 
 loadMedia();
 refresh();

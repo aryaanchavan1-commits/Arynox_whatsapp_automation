@@ -90,6 +90,13 @@ function startServer(state, getCtx) {
         maxPerMinute: state.config.maxMessagesPerMinute,
         sessionName: state.config.sessionName,
       },
+      ai: {
+        provider: state.config.aiProvider,
+        model: state.config.aiModel.groq,
+        fallbackModel: state.config.aiModel.opencode,
+        groqKeyConfigured: !!(state.config.groqApiKey || ''),
+        opencodeKeyConfigured: !!(state.config.opencodeApiKey || ''),
+      },
     });
   });
 
@@ -212,6 +219,17 @@ function startServer(state, getCtx) {
     }
     state.log('Auto-reply ' + (enabled ? 'ENABLED' : 'DISABLED') + (state.autoReply.media ? ' (with media)' : ''));
     res.json({ ok: true, autoReply: state.autoReply });
+  });
+
+  app.post('/api/ai/test', async (req, res) => {
+    const { question } = req.body || {};
+    const { getAIReply } = require('./ai');
+    try {
+      const reply = await getAIReply(question || 'Say hello in one short friendly sentence', [], state);
+      res.json({ ok: !!reply, reply: reply || 'AI returned nothing (both providers failed - check keys in .env)' });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message || String(e) });
+    }
   });
 
   app.post('/api/business', (req, res) => {
