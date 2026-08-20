@@ -13,6 +13,37 @@ const { humanTypingDelay, interMessageDelay } = require('./utils/humanizer');
 const { sleep } = require('./utils/delay');
 
 const messageTimestamps = {};
+let activeCtx = null;
+
+function getActiveCtx() {
+  return activeCtx;
+}
+
+const CACHE_FILE = path.join(__dirname, '..', 'data', 'chats-cache.json');
+
+function loadCache() {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const d = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      return { chats: d.chats || [], contacts: d.contacts || [] };
+    }
+  } catch (e) { /* ignore */ }
+  return { chats: [], contacts: [] };
+}
+
+let cacheTimer = null;
+function scheduleCacheSave(chatStore) {
+  clearTimeout(cacheTimer);
+  cacheTimer = setTimeout(() => {
+    try {
+      fs.mkdirSync(path.join(__dirname, '..', 'data'), { recursive: true });
+      fs.writeFileSync(CACHE_FILE, JSON.stringify({
+        chats: Array.from(chatStore.chats.values()),
+        contacts: Array.from(chatStore.contacts.values()),
+      }));
+    } catch (e) { /* ignore */ }
+  }, 3000);
+}
 
 function isRateLimited(from) {
   const now = Date.now();
@@ -76,24 +107,48 @@ async function startBot(state) {
     auth: authState,
     printQRInTerminal: false,
     browser: ['Arynox Automation', 'Chrome', '120.0.0.0'],
-    syncFullHistory: false,
+    syncFullHistory: true,
     markOnlineOnConnect: false,
     generateHighQualityLinkPreview: false,
   });
 
-  const chatStore = { chats: new Map(), contacts: new Map() };
+  const cached = loadCache();
+  const chatStore = {
+    chats: new Map(cached.chats.map(c => [c.id, c])),
+    contacts: new Map(cached.contacts.map(c => [c.id, c])),
+  };
 
   sock.ev.on('chats.upsert', chats => {
     for (const c of chats) chatStore.chats.set(c.id, { id: c.id, name: c.name, isGroup: c.id.endsWith('@g.us') });
+    scheduleCacheSave(chatStore);
   });
   sock.ev.on('chats.update', updates => {
     for (const u of updates) {
       const existing = chatStore.chats.get(u.id);
       if (existing) chatStore.chats.set(u.id, Object.assign({}, existing, { name: u.name !== undefined ? u.name : existing.name }));
     }
+    scheduleCacheSave(chatStore);
   });
   sock.ev.on('contacts.upsert', contacts => {
-    for (const c of contacts) chatStore.contacts.set(c.id, c);
+    for (const c of contacts) {
+      if (!c.id) continue;
+      chatStore.contacts.set(c.id, c);
+    }
+    scheduleCacheSave(chatStore);
+  });
+
+  sock.ev.on('messaging-history.set', ({ chats, contacts, messages }) => {
+    let groups = 0;
+    for (const c of chats || []) {
+      if (c.id.endsWith('@g.us')) groups++;
+      chatStore.chats.set(c.id, { id: c.id, name: c.name, isGroup: c.id.endsWith('@g.us') });
+    }
+    for (const c of contacts || []) {
+      if (!c.id) continue;
+      chatStore.contacts.set(c.id, c);
+    }
+    scheduleCacheSave(chatStore);
+    state.log('History sync complete: ' + (chats ? chats.length : 0) + ' chats (' + groups + ' groups), ' + (contacts ? contacts.length : 0) + ' contacts');
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -120,21 +175,26 @@ async function startBot(state) {
       try {
         state.phone = sock.user ? sock.user.id.split(':')[0] : null;
       } catch (e) { /* ignore */ }
-      state.log('Bot is ready and connected');
+      state.log('Bot is ready and connected - syncing contacts...');
+      try {
+        if (typeof sock.fetchMessageHistory === 'function') {
+          sock.fetchMessageHistory(10000).catch(() => {});
+        }
+      } catch (e) { /* ignore */ }
     }
 
     if (connection === 'close') {
       const code = lastDisconnect && lastDisconnect.error
         ? lastDisconnect.error.output && lastDisconnect.error.output.statusCode
         : null;
-      if (code === DisconnectReason.loggedOut) {
-        state.status = 'error';
-        state.lastError = 'Session logged out. Please delete the session folder and re-scan.';
+      if (code === DisconnectReason.loggedOut || code === DisconnectReason.badSession || code === 401) {
+        state.status = 'qr';
+        state.lastError = 'Session invalid - resetting for a fresh QR code...';
         state.log(state.lastError);
-      } else if (code === DisconnectReason.badSession) {
-        state.status = 'error';
-        state.lastError = 'Bad session. Delete session_' + config.sessionName + ' and re-scan.';
-        state.log(state.lastError);
+        try {
+          fs.rmSync(sessionDir, { recursive: true, force: true });
+        } catch (e) { /* ignore */ }
+        setTimeout(() => startBot(state), 1500);
       } else {
         state.status = 'disconnected';
         state.lastError = 'Disconnected (code ' + code + ')';
@@ -152,6 +212,11 @@ async function startBot(state) {
         const isGroup = jid.endsWith('@g.us');
         const text = getMessageText(msg);
         state.messageCount++;
+
+        if (!isGroup && msg.pushName && !chatStore.contacts.has(jid)) {
+          chatStore.contacts.set(jid, { id: jid, name: msg.pushName });
+          scheduleCacheSave(chatStore);
+        }
 
         if (isRateLimited(jid)) continue;
 
@@ -211,20 +276,36 @@ async function startBot(state) {
     }
   });
 
-  return { sock, store: chatStore, log };
+  const ctx = { sock, store: chatStore, log };
+  activeCtx = ctx;
+  return ctx;
 }
 
 async function getChats(ctx) {
   const { store } = ctx;
   const result = [];
+  const seen = new Set();
   for (const chat of store.chats.values()) {
     try {
       if (chat.isGroup) continue;
       const contact = store.contacts.get(chat.id);
       const name = (contact && (contact.name || contact.notify)) || chat.name || chat.id.split('@')[0];
+      seen.add(chat.id);
       result.push({
         id: chat.id,
         number: chat.id.split('@')[0],
+        name: String(name),
+      });
+    } catch (e) { /* skip */ }
+  }
+  for (const contact of store.contacts.values()) {
+    try {
+      const id = contact.id;
+      if (!id || seen.has(id) || id.endsWith('@g.us') || id.endsWith('@newsletter')) continue;
+      const name = contact.name || contact.notify || id.split('@')[0];
+      result.push({
+        id,
+        number: id.split('@')[0],
         name: String(name),
       });
     } catch (e) { /* skip */ }
@@ -264,4 +345,4 @@ async function bulkSend(ctx, numbers, message, state, mediaFile) {
   state.log('Bulk send finished: ' + state.bulk.sent + ' sent, ' + state.bulk.failed + ' failed');
 }
 
-module.exports = { startBot, isRateLimited, getChats, bulkSend, normalizeJid, sendMedia, findMedia, parseMediaTag };
+module.exports = { startBot, isRateLimited, getChats, bulkSend, normalizeJid, sendMedia, findMedia, parseMediaTag, getActiveCtx };

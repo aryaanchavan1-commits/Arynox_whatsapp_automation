@@ -1,5 +1,5 @@
 const config = require('./config');
-const { startBot } = require('./src/bot');
+const { startBot, getActiveCtx } = require('./src/bot');
 const { startServer } = require('./src/server');
 const { loadBusiness, loadKnowledge } = require('./src/knowledge');
 const { listMedia } = require('./src/media');
@@ -46,10 +46,7 @@ const state = {
 
 state.refreshMedia();
 
-let ctxRef = null;
-
 if (state.backend === 'meta') {
-  ctxRef = { mode: 'meta' };
   if (isConfigured(metaConfig)) {
     state.status = 'ready';
     state.log('Meta Cloud API backend active (configured) - waiting for webhook messages');
@@ -58,13 +55,11 @@ if (state.backend === 'meta') {
     state.log('Meta Cloud API backend selected but NOT configured - open the dashboard to set it up');
   }
 } else {
-  startBot(state).then(ctx => {
-    ctxRef = ctx;
-  }).catch(e => {
+  startBot(state).catch(e => {
     state.status = 'error';
     state.lastError = e.message || String(e);
     state.log('Bot crashed: ' + state.lastError);
   });
 }
 
-startServer(state, () => ctxRef);
+startServer(state, () => getActiveCtx());

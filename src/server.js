@@ -98,6 +98,20 @@ function startServer(state, getCtx) {
     res.json({ qr: state.qr });
   });
 
+  app.post('/api/qr/reset', async (req, res) => {
+    if (isMeta()) return res.status(400).json({ ok: false, error: 'Not available in Meta mode' });
+    const sessionDir = path.join(__dirname, '..', 'session_' + state.config.sessionName);
+    try {
+      fs.rmSync(sessionDir, { recursive: true, force: true });
+    } catch (e) { /* ignore */ }
+    state.log('Session reset - a fresh QR code will appear');
+    const ctx = getCtx();
+    try {
+      if (ctx && ctx.sock) await ctx.sock.end(new Error('Session reset by user'));
+    } catch (e) { /* ignore */ }
+    res.json({ ok: true });
+  });
+
   app.get('/api/chats', async (req, res) => {
     if (isMeta()) {
       return res.json({ ok: true, chats: getMetaChats(state) });

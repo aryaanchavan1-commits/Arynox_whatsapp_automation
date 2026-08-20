@@ -74,6 +74,15 @@
   .doc-row { display: flex; align-items: center; justify-content: space-between; background: #0f172a; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; }
   .doc-row .d-name { font-size: 13px; color: #e2e8f0; word-break: break-all; }
   .hint { font-size: 12px; color: #64748b; margin-top: 6px; }
+  .backend-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .backend-tile { background: #0f172a; border: 2px solid #334155; border-radius: 12px; padding: 16px; cursor: pointer; transition: 0.2s; }
+  .backend-tile:hover { border-color: #475569; }
+  .backend-tile.active { border-color: #25D366; background: #052e16; }
+  .backend-tile .bt-title { font-size: 15px; font-weight: 800; letter-spacing: 1px; color: #f1f5f9; }
+  .backend-tile.active .bt-title { color: #25D366; }
+  .backend-tile .bt-desc { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+  .panel-title { font-size: 14px; font-weight: 700; color: #e2e8f0; margin-bottom: 10px; }
+  @media (max-width: 800px) { .backend-tiles { grid-template-columns: 1fr; } }
   @media (max-width: 800px) { main { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
@@ -86,13 +95,35 @@
 <main>
   <div class="card full">
     <h2>Connection Backend</h2>
-    <label>Choose how the bot connects to WhatsApp</label>
-    <select id="backendSelect">
-      <option value="baileys">Unofficial (Baileys) - free, scan QR, no approval needed</option>
-      <option value="meta">Official Meta Cloud API - safe, needs Meta business setup</option>
+    <div class="backend-tiles">
+      <div class="backend-tile" id="tile-baileys" onclick="setBackend('baileys')">
+        <div class="bt-title">UNOFFICIAL</div>
+        <div class="bt-desc">Free &bull; Scan QR code &bull; No approval needed</div>
+      </div>
+      <div class="backend-tile" id="tile-meta" onclick="setBackend('meta')">
+        <div class="bt-title">OFFICIAL</div>
+        <div class="bt-desc">Meta Cloud API &bull; Business number &bull; Webhook setup</div>
+      </div>
+    </div>
+    <select id="backendSelect" style="display:none;">
+      <option value="baileys">baileys</option>
+      <option value="meta">meta</option>
     </select>
+    <div id="qrPanel" style="margin-top:14px;">
+      <div class="panel-title">Unofficial connection - scan QR with WhatsApp</div>
+      <div id="qrWrap">
+        <img id="qrImg" class="placeholder" alt="QR code">
+        <div id="qrHint" style="color:#94a3b8;font-size:13px;text-align:center;">Waiting for QR code...<br>Open WhatsApp &rarr; Linked Devices &rarr; Link a Device</div>
+      </div>
+      <div class="row" style="margin-top:12px;max-width:340px;">
+        <button class="btn ghost" onclick="resetQr()">Reset &amp; Get New QR</button>
+        <div id="qrResetMsg" class="msg" style="align-self:center;"></div>
+      </div>
+      <div class="hint">Shows ALL your WhatsApp contacts automatically after connecting.</div>
+    </div>
     <div id="metaSetup" style="display:none;margin-top:12px;">
-      <div class="hint" style="margin-top:0;">Official WhatsApp API. You need: Meta Business account, WhatsApp Business number, access token, and a public HTTPS URL (ngrok, VPS or Koyeb) for the webhook. After saving, restart the app.</div>
+      <div class="panel-title">Official connection - Meta WhatsApp Cloud API</div>
+      <div class="hint" style="margin-top:0;">You need: Meta Business account, WhatsApp Business number, access token, and a public HTTPS URL (ngrok, VPS or Koyeb) for the webhook. After saving, restart the app.</div>
       <label>Access token (permanent - from Meta System User)</label>
       <input id="metaToken" type="password" placeholder="EAAG...">
       <label>Phone number ID</label>
@@ -115,10 +146,6 @@
         <input id="metaTestMessage" placeholder="Hello from Arynox!">
       </div>
       <div id="webhookInfo" class="hint" style="background:#0f172a;border-radius:8px;padding:10px;margin-top:12px;"></div>
-    </div>
-    <div id="qrWrap" style="margin-top:14px;">
-      <img id="qrImg" class="placeholder" alt="QR code">
-      <div id="qrHint" style="color:#94a3b8;font-size:13px;text-align:center;">Waiting for QR code...<br>Open WhatsApp &rarr; Linked Devices &rarr; Link a Device</div>
     </div>
   </div>
 
@@ -250,7 +277,10 @@ function setPill(status) {
 function updateBackendUI() {
   const isMeta = state && state.backend === 'meta';
   document.getElementById('backendSelect').value = isMeta ? 'meta' : 'baileys';
+  document.getElementById('tile-baileys').classList.toggle('active', !isMeta);
+  document.getElementById('tile-meta').classList.toggle('active', isMeta);
   document.getElementById('metaSetup').style.display = isMeta ? 'block' : 'none';
+  document.getElementById('qrPanel').style.display = isMeta ? 'none' : 'block';
   document.getElementById('manualContactRow').style.display = isMeta ? 'flex' : 'none';
   const qrWrap = document.getElementById('qrWrap');
   if (isMeta) {
@@ -569,6 +599,24 @@ document.getElementById('backendSelect').addEventListener('change', e => {
   msg.className = 'msg';
   msg.textContent = 'Backend switched to ' + (e.target.value === 'meta' ? 'Meta Cloud API' : 'Baileys') + '. Enter Meta settings below and click Save (a restart is required to apply).';
 });
+
+function setBackend(b) {
+  document.getElementById('backendSelect').value = b;
+  document.getElementById('backendSelect').dispatchEvent(new Event('change'));
+  updateBackendUI();
+}
+
+async function resetQr() {
+  const m = document.getElementById('qrResetMsg');
+  m.className = 'msg';
+  m.textContent = 'Resetting...';
+  try {
+    const res = await fetch('/api/qr/reset', { method: 'POST' });
+    const data = await res.json();
+    m.className = 'msg' + (data.ok ? '' : ' err');
+    m.textContent = data.ok ? 'Session deleted - scanning a new QR code in a moment...' : (data.error || 'Failed');
+  } catch (e) { m.className = 'msg err'; m.textContent = 'Failed: ' + e.message; }
+}
 
 document.getElementById('saveMetaBtn').addEventListener('click', async () => {
   const body = {
