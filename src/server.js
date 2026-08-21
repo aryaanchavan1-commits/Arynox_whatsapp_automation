@@ -18,6 +18,7 @@ const {
   extractTextFromBuffer,
 } = require('./knowledge');
 const { listMedia, setNote, deleteMedia } = require('./media');
+const safety = require('./safety');
 const {
   isConfigured,
   toDigits,
@@ -112,6 +113,17 @@ function startServer(state, getCtx) {
     res.sendFile(path.join(publicDir, 'index.html'));
   });
 
+  app.get('/api/safety', (req, res) => {
+    res.json({ ok: true, safety: safety.getStats() });
+  });
+
+  app.post('/api/safety/settings', (req, res) => {
+    const b = req.body || {};
+    const settings = safety.updateSettings(b);
+    state.log('Safety settings updated (daily cap ' + settings.dailyCap + ', hourly cap ' + settings.hourlyCap + ', quiet ' + (settings.quietEnabled ? settings.quietStart + '-' + settings.quietEnd : 'off') + ')');
+    res.json({ ok: true, safety: safety.getStats() });
+  });
+
   app.get('/api/health', (req, res) => {
     res.json({
       ok: true,
@@ -159,6 +171,7 @@ function startServer(state, getCtx) {
       autoReply: state.autoReply,
       automation: state.automation,
       bulk: state.bulk,
+      safety: safety.getStats(),
       business: state.business,
       knowledgeDocs: state.knowledge.docs.map(d => ({ name: d.name, size: d.size })),
       mediaCount: state.media.length,

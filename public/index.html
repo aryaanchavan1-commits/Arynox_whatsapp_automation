@@ -114,7 +114,20 @@ input, textarea, select { font-family: inherit; }
 
 .card {
   background: var(--card); border: 1px solid var(--border-soft); border-radius: var(--radius);
-  padding: 20px; box-shadow: var(--shadow); transition: border-color .2s;
+  padding: 20px; box-shadow: var(--shadow); transition: border-color .2s, transform .2s;
+}
+.card:hover { border-color: var(--border); }
+.progress-bar { height: 10px; border-radius: 20px; background: var(--bg3); border: 1px solid var(--border-soft); overflow: hidden; }
+.progress-bar > div { height: 100%; width: 0%; background: var(--accent-grad); border-radius: 20px; transition: width .6s ease; }
+.progress-bar.hot > div { background: linear-gradient(135deg, #fbbf24, #f87171); }
+.safety-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0; }
+@media (max-width: 700px) { .safety-grid { grid-template-columns: 1fr 1fr; } }
+.safety-cell { background: var(--bg3); border: 1px solid var(--border-soft); border-radius: var(--radius-sm); padding: 10px 12px; }
+.safety-cell .sc-label { font-size: 11px; color: var(--text3); font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
+.safety-cell .sc-value { font-size: 18px; font-weight: 800; margin-top: 2px; }
+.badge-warmup {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px;
+  background: var(--chip); border: 1px solid var(--border-soft); font-size: 11.5px; font-weight: 800; color: var(--warn);
 }
 .card-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text2); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
 .card-title svg { width: 16px; height: 16px; color: var(--accent); }
@@ -419,6 +432,30 @@ code { background: var(--chip); padding: 2px 7px; border-radius: 6px; font-size:
           <div class="log-box" id="logBox"></div>
         </div>
       </div>
+
+      <div class="card" style="margin-top:18px;">
+        <div class="card-title">Safety &amp; Limits <span class="badge-warmup" id="warmupBadge" style="margin-left:auto;">&#128274; Warm-up</span></div>
+        <div class="row" style="justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+          <span class="hint" style="margin:0;">Today's sending usage (auto-throttled to keep your number safe)</span>
+          <span class="hint" style="margin:0;font-weight:800;color:var(--text);" id="usageLabel">0 / 500</span>
+        </div>
+        <div class="progress-bar" id="safetyBar"><div></div></div>
+        <div class="safety-grid">
+          <div class="safety-cell"><div class="sc-label">Sent today</div><div class="sc-value" id="sfToday">0</div></div>
+          <div class="safety-cell"><div class="sc-label">This hour</div><div class="sc-value" id="sfHour">0<span style="font-size:12px;color:var(--text3);"> / 30</span></div></div>
+          <div class="safety-cell"><div class="sc-label">Opted out</div><div class="sc-value" id="sfOpt">0</div></div>
+          <div class="safety-cell"><div class="sc-label">Quiet hours</div><div class="sc-value" id="sfQuiet" style="font-size:14px;">22:00 - 08:00</div></div>
+        </div>
+        <div class="row wrap" style="gap:10px;align-items:flex-end;">
+          <div><label class="f">Daily cap</label><input type="number" id="sfDailyCap" min="10" max="2000" style="width:110px;"></div>
+          <div><label class="f">Hourly cap</label><input type="number" id="sfHourlyCap" min="1" max="200" style="width:90px;"></div>
+          <div><label class="f">Quiet from</label><input type="number" id="sfQStart" min="0" max="23" style="width:80px;"></div>
+          <div><label class="f">Quiet until</label><input type="number" id="sfQEnd" min="0" max="23" style="width:80px;"></div>
+          <label class="chip" style="cursor:pointer;"><input type="checkbox" id="sfQuietOn" style="width:16px;height:16px;accent-color:var(--accent);"> Quiet hours on</label>
+          <button class="btn sm" onclick="saveSafety()">Save Safety Settings</button>
+        </div>
+        <div class="hint" style="margin-top:10px;">New numbers start in warm-up mode (25 &rarr; 50 &rarr; 100 &rarr; 200 &rarr; 400 msgs/day over 5 days). Customers who reply "stop" are never messaged again. Bulk sends pause automatically during quiet hours and cool down 25 messages at a time.</div>
+      </div>
     </section>
 
     <!-- ============ CONTACTS ============ -->
@@ -460,6 +497,7 @@ code { background: var(--chip); padding: 2px 7px; border-radius: 6px; font-size:
           <div class="chip" id="sendChip" style="margin-bottom:12px;">0 recipients selected</div>
           <label class="f">Message</label>
           <textarea id="bulkMsg" placeholder="Hello! This is an automated message..."></textarea>
+          <div class="hint" style="margin-top:6px;">Anti-ban tip: use <code>{Hi|Hey|Hello}</code> to vary the text per recipient &mdash; identical bulk messages are a big ban signal. Sends pause automatically at your daily cap and during quiet hours.</div>
           <label class="f">Attach media (optional)</label>
           <select id="bulkMedia"><option value="">No media</option></select>
           <div class="row" style="margin-top:14px;">
@@ -697,6 +735,7 @@ function refresh() {
     if (d.automation) {
       document.getElementById('aiAutoToggle').checked = d.automation.aiEnabled;
     }
+    if (d.safety) renderSafety(d.safety);
     if (d.business) {
       document.getElementById('bizName').value = d.business.businessName || '';
       document.getElementById('bizDesc').value = d.business.businessDescription || '';
@@ -869,6 +908,53 @@ async function loadChats() {
   } catch (e) {
     document.getElementById('contactsBox').innerHTML = '<div class="empty">Failed to load contacts</div>';
   }
+}
+
+function renderSafety(s) {
+  const pct = Math.min(100, Math.round((s.sentToday / Math.max(1, s.dailyCap)) * 100));
+  const bar = document.getElementById('safetyBar');
+  bar.classList.toggle('hot', pct >= 80);
+  bar.firstElementChild.style.width = pct + '%';
+  document.getElementById('usageLabel').textContent = s.sentToday + ' / ' + s.dailyCap + (pct >= 80 ? ' (' + pct + '%)' : '');
+  document.getElementById('sfToday').textContent = s.sentToday;
+  document.getElementById('sfHour').innerHTML = s.sentThisHour + '<span style="font-size:12px;color:var(--text3);"> / ' + s.hourlyCap + '</span>';
+  document.getElementById('sfOpt').textContent = s.optedOutCount;
+  const q = s.settings || {};
+  document.getElementById('sfQuiet').innerHTML = q.quietEnabled
+    ? String(q.quietStart).padStart(2, '0') + ':00 - ' + String(q.quietEnd).padStart(2, '0') + ':00' + (s.quietActive ? ' <span style="color:var(--warn);font-size:12px;">(active)</span>' : '')
+    : '<span style="color:var(--text3);">off</span>';
+  const wb = document.getElementById('warmupBadge');
+  if (s.warmupDay) {
+    wb.innerHTML = '&#128274; Warm-up day ' + s.warmupDay + ' / 5';
+    wb.style.display = 'inline-flex';
+  } else {
+    wb.innerHTML = '&#9989; Full speed';
+    wb.style.color = 'var(--accent)';
+  }
+  if (!renderSafety._touched) {
+    document.getElementById('sfDailyCap').value = q.dailyCap || 500;
+    document.getElementById('sfHourlyCap').value = q.hourlyCap || 30;
+    document.getElementById('sfQStart').value = q.quietStart != null ? q.quietStart : 22;
+    document.getElementById('sfQEnd').value = q.quietEnd != null ? q.quietEnd : 8;
+    document.getElementById('sfQuietOn').checked = !!q.quietEnabled;
+    renderSafety._touched = true;
+  }
+}
+
+async function saveSafety() {
+  const body = {
+    dailyCap: Number(document.getElementById('sfDailyCap').value),
+    hourlyCap: Number(document.getElementById('sfHourlyCap').value),
+    quietStart: Number(document.getElementById('sfQStart').value),
+    quietEnd: Number(document.getElementById('sfQEnd').value),
+    quietEnabled: document.getElementById('sfQuietOn').checked,
+  };
+  try {
+    const r = await fetch('/api/safety/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.ok) toast('Safety settings saved');
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }
 
 function timeAgo(ts) {

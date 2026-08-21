@@ -12,6 +12,7 @@ const { findMedia, getMediaType } = require('./media');
 const { humanTypingDelay, interMessageDelay } = require('./utils/humanizer');
 const { sleep } = require('./utils/delay');
 const { getHistory, addToHistory, clearHistory, isProcessed, setLastMessage, getLastMessages } = require('./memory');
+const safety = require('./safety');
 
 const messageTimestamps = {};
 let activeCtx = null;
@@ -243,6 +244,11 @@ async function startBot(state) {
         await sock.readMessages([msg.key]);
 
         const reply = async (content, mediaFile) => {
+          const gate = safety.canSend(1);
+          if (!gate.allowed) {
+            state.log('Safety gate (' + gate.reason + ') - reply held back for ' + jid.split('@')[0]);
+            return false;
+          }
           await sock.sendPresenceUpdate('composing', jid);
           await humanTypingDelay(content || ' ');
           await interMessageDelay(config.minDelayBetweenMessages, config.maxDelayBetweenMessages);
@@ -252,13 +258,28 @@ async function startBot(state) {
             await sock.sendMessage(jid, { text: content });
           }
           await sock.sendPresenceUpdate('paused', jid);
+          safety.recordSent(1);
           state.sentCount++;
+          return true;
         };
 
         if (isGroup) {
           if (text.startsWith('!')) {
             await reply(text);
           }
+          continue;
+        }
+
+        if (safety.isOptOutRequest(text)) {
+          const added = safety.optOut(jid);
+          if (added) {
+            state.log('Opt-out: ' + jid.split('@')[0] + ' will not be messaged again');
+            await sock.sendMessage(jid, { text: 'Got it. You have been removed from our messages and will not hear from us again.' });
+            safety.recordSent(1);
+          }
+          continue;
+        }
+        if (safety.isOptedOut(jid)) {
           continue;
         }
 
@@ -349,31 +370,66 @@ async function bulkSend(ctx, numbers, message, state, mediaFile) {
   state.bulk = { active: true, total: numbers.length, sent: 0, failed: 0, current: '', status: 'starting' };
   state.log('Bulk send started: ' + numbers.length + ' recipients' + (mediaFile ? ' (with ' + mediaFile.fileName + ')' : ''));
 
+  let sinceBreak = 0;
   for (let i = 0; i < numbers.length; i++) {
     const to = normalizeJid(numbers[i]);
     state.bulk.current = to;
+
+    if (safety.isOptedOut(to)) {
+      state.bulk.failed++;
+      state.bulk.status = 'skipped (opted out) ' + (i + 1) + '/' + numbers.length;
+      continue;
+    }
+
+    const gate = safety.canSend(1);
+    if (!gate.allowed) {
+      const waitMin = Math.ceil((gate.waitMs || 60000) / 60000);
+      if ((gate.reason === 'daily-cap' && waitMin > 120) || waitMin > 180) {
+        state.bulk.status = 'paused (' + gate.reason + ')';
+        state.log('Bulk paused: ' + gate.reason + ' - will resume automatically in ~' + waitMin + ' min');
+        await sleep(Math.min(gate.waitMs || 3600000, 6 * 3600000));
+        i--;
+        continue;
+      }
+      state.log('Bulk waiting ' + Math.round((gate.waitMs || 60000) / 1000) + 's (' + gate.reason + ')...');
+      await sleep(gate.waitMs || 60000);
+      i--;
+      continue;
+    }
+
+    const personalized = safety.spin(message);
     state.bulk.status = 'sending (' + (i + 1) + '/' + numbers.length + ')';
     try {
       if (mediaFile) {
-        await sendMedia(sock, to, mediaFile, message);
+        await sendMedia(sock, to, mediaFile, personalized);
       } else {
-        await sock.sendMessage(to, { text: message });
+        await sock.sendMessage(to, { text: personalized });
       }
+      safety.recordSent(1);
       state.bulk.sent++;
       state.sentCount++;
+      sinceBreak++;
     } catch (e) {
       state.bulk.failed++;
       state.log('Bulk send failed to ' + to + ': ' + (e.message || e));
     }
+
     if (i < numbers.length - 1) {
       await interMessageDelay(config.bulkMinDelay, config.bulkMaxDelay);
+      if (sinceBreak >= 25) {
+        const pause = 90000 + Math.floor(Math.random() * 150000);
+        state.bulk.status = 'cooling down (' + Math.round(pause / 1000) + 's)';
+        state.log('Batch of 25 sent - cooling down ' + Math.round(pause / 1000) + 's (anti-ban)');
+        await sleep(pause);
+        sinceBreak = 0;
+      }
     }
   }
 
   state.bulk.active = false;
   state.bulk.status = 'done';
   state.bulk.current = '';
-  state.log('Bulk send finished: ' + state.bulk.sent + ' sent, ' + state.bulk.failed + ' failed');
+  state.log('Bulk send finished: ' + state.bulk.sent + ' sent, ' + state.bulk.failed + ' failed/skipped');
 }
 
 module.exports = { startBot, isRateLimited, getChats, bulkSend, normalizeJid, sendMedia, findMedia, parseMediaTag, getActiveCtx };

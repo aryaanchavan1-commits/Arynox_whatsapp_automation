@@ -7,6 +7,7 @@ const { getAIReply } = require('./ai');
 const { interMessageDelay } = require('./utils/humanizer');
 const { sleep } = require('./utils/delay');
 const { getHistory, addToHistory, clearHistory, isProcessed, setLastMessage } = require('./memory');
+const safety = require('./safety');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const META_CONFIG_FILE = path.join(DATA_DIR, 'meta-config.json');
@@ -162,11 +163,30 @@ async function processInbound(state, from, name, text, messageId) {
     await sleep(500 + Math.random() * 1000);
 
     const reply = async (content, mediaFile) => {
+      const gate = safety.canSend(1);
+      if (!gate.allowed) {
+        state.log('Safety gate (' + gate.reason + ') - reply held back for ' + from);
+        return false;
+      }
       await sendToOne(state, from, content, mediaFile);
+      safety.recordSent(1);
+      return true;
     };
 
     const lower = text.toLowerCase();
     let out;
+    if (safety.isOptOutRequest(text)) {
+      const added = safety.optOut(from);
+      if (added) {
+        state.log('Opt-out: ' + from + ' will not be messaged again');
+        await sendToOne(state, from, 'Got it. You have been removed from our messages and will not hear from us again.');
+        safety.recordSent(1);
+      }
+      return;
+    }
+    if (safety.isOptedOut(from)) {
+      return;
+    }
     if (lower === '!help') {
       out = 'Available commands:\n!help - Show this help\n!ping - Pong!\n!time - Current time\n!reset - Clear conversation memory';
     } else if (lower === '!ping') {
@@ -245,31 +265,65 @@ async function metaBulkSend(state, numbers, message, mediaFile) {
   state.bulk = { active: true, total: numbers.length, sent: 0, failed: 0, current: '', status: 'starting' };
   state.log('Bulk send started (Meta API): ' + numbers.length + ' recipients' + (mediaFile ? ' (with ' + mediaFile.fileName + ')' : ''));
 
+  let sinceBreak = 0;
   for (let i = 0; i < numbers.length; i++) {
     const to = toDigits(numbers[i]);
     state.bulk.current = to;
+
+    if (safety.isOptedOut(to)) {
+      state.bulk.failed++;
+      state.bulk.status = 'skipped (opted out) ' + (i + 1) + '/' + numbers.length;
+      continue;
+    }
+
+    const gate = safety.canSend(1);
+    if (!gate.allowed) {
+      const waitMin = Math.ceil((gate.waitMs || 60000) / 60000);
+      if (waitMin > 180) {
+        state.bulk.status = 'paused (' + gate.reason + ')';
+        state.log('Bulk paused: ' + gate.reason + ' - will resume automatically in ~' + waitMin + ' min');
+        await sleep(Math.min(gate.waitMs || 3600000, 6 * 3600000));
+        i--;
+        continue;
+      }
+      state.log('Bulk waiting ' + Math.round((gate.waitMs || 60000) / 1000) + 's (' + gate.reason + ')...');
+      await sleep(gate.waitMs || 60000);
+      i--;
+      continue;
+    }
+
+    const personalized = safety.spin(message);
     state.bulk.status = 'sending (' + (i + 1) + '/' + numbers.length + ')';
     try {
       if (mediaFile) {
-        await sendMediaMessage(cfg, to, mediaFile, message);
+        await sendMediaMessage(cfg, to, mediaFile, personalized);
       } else {
-        await sendTextMessage(cfg, to, message);
+        await sendTextMessage(cfg, to, personalized);
       }
+      safety.recordSent(1);
       state.bulk.sent++;
       state.sentCount++;
+      sinceBreak++;
     } catch (e) {
       state.bulk.failed++;
       state.log('Bulk send failed to ' + to + ': ' + (e.message || e));
     }
     if (i < numbers.length - 1) {
       await interMessageDelay(config.bulkMinDelay, config.bulkMaxDelay);
+      if (sinceBreak >= 25) {
+        const pause = 90000 + Math.floor(Math.random() * 150000);
+        state.bulk.status = 'cooling down (' + Math.round(pause / 1000) + 's)';
+        state.log('Batch of 25 sent - cooling down ' + Math.round(pause / 1000) + 's');
+        await sleep(pause);
+        sinceBreak = 0;
+      }
     }
   }
 
   state.bulk.active = false;
   state.bulk.status = 'done';
   state.bulk.current = '';
-  state.log('Bulk send finished: ' + state.bulk.sent + ' sent, ' + state.bulk.failed + ' failed');
+  state.log('Bulk send finished: ' + state.bulk.sent + ' sent, ' + state.bulk.failed + ' failed/skipped');
 }
 
 module.exports = {

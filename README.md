@@ -48,6 +48,21 @@ META_PUBLIC_URL=
 
 Anti-ban timing is in `config.js`: `minDelayBetweenMessages`, `maxDelayBetweenMessages`, `maxMessagesPerMinute`, `bulkMinDelay`, `bulkMaxDelay`.
 
+## Anti-ban safety system
+
+**Honest disclaimer:** no unofficial WhatsApp automation is 100% "unbannable" — WhatsApp's terms prohibit it, and anyone claiming otherwise is selling you something. What this app does is make bans *very unlikely* by behaving like a human and respecting recipients:
+
+- **Warm-up mode** — new sessions ramp up automatically: 25 → 50 → 100 → 200 → 400 messages/day over the first 5 days (the #1 reason new bots get banned is sending too much too early)
+- **Daily + hourly caps** — hard limits enforced on every send (default 500/day, 30/hour), adjustable live from the dashboard
+- **Quiet hours** — nothing sends between 22:00–08:00 by default; bulk sends pause and resume automatically
+- **Opt-out handling** — customers who reply "stop" / "unsubscribe" are never messaged again (persisted list)
+- **Message spinning** — write `{Hi|Hey|Hello}` in bulk messages; each recipient gets a random variant so texts aren't identical
+- **Batch cooling** — bulk sends pause 1.5–4 min after every 25 messages
+- **Human behavior** — typing simulation scaled to message length, randomized delays, read receipts with natural timing, per-user rate limiting
+- **Official route available** — for guaranteed compliance, switch to the Meta Cloud API backend (official, no ban risk from automation itself)
+
+All limits are visible live on the dashboard's **Safety & Limits** card.
+
 ## Security (production)
 
 - Set `DASHBOARD_PASSWORD` in `.env`. The dashboard then requires login (signed cookie, 7 days) — without it, **anyone who can reach the server can control the bot, read your contacts and send messages**. Never expose the server without a password.

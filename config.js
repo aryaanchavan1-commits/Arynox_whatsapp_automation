@@ -20,5 +20,10 @@ module.exports = {
   autoReplyMessage: "I'm currently away and can't reply right now. I will get back to you as soon as possible.",
   bulkMinDelay: 4000,
   bulkMaxDelay: 12000,
+  safetyDailyCap: Number(process.env.SAFETY_DAILY_CAP) || 500,
+  safetyHourlyCap: Number(process.env.SAFETY_HOURLY_CAP) || 30,
+  safetyQuietEnabled: process.env.SAFETY_QUIET_ENABLED !== 'false',
+  safetyQuietStart: process.env.SAFETY_QUIET_START != null ? Number(process.env.SAFETY_QUIET_START) : 22,
+  safetyQuietEnd: process.env.SAFETY_QUIET_END != null ? Number(process.env.SAFETY_QUIET_END) : 8,
   enabled: true,
 };
