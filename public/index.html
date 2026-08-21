@@ -878,12 +878,13 @@ function updateBackendUI() {
 }
 
 function setBackend(b) {
+  const current = state && state.backend ? state.backend : 'baileys';
   const tile = b === 'meta' ? document.getElementById('tile-meta') : document.getElementById('tile-baileys');
   document.getElementById('tile-baileys').classList.toggle('active', b === 'baileys');
   document.getElementById('tile-meta').classList.toggle('active', b === 'meta');
   document.getElementById('qrPanel').style.display = b === 'meta' ? 'none' : 'block';
   document.getElementById('metaPanel').style.display = b === 'meta' ? 'block' : 'none';
-  if (b === 'meta') toast('Official Meta setup shown. Save settings, then restart the app to apply.', 'info');
+  if (b === 'meta' && current !== 'meta') toast('Official Meta setup shown. Save settings, then restart the app to apply.', 'info');
 }
 
 async function resetQr() {
