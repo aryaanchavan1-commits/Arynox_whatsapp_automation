@@ -20,6 +20,7 @@ const {
 const { listMedia, setNote, deleteMedia } = require('./media');
 const safety = require('./safety');
 const db = require('./db');
+const settingsStore = require('./settings');
 const {
   isConfigured,
   toDigits,
@@ -87,6 +88,7 @@ function startServer(state, getCtx) {
   }
 
   app.use('/api', async (req, res, next) => {
+    if (!authRequired && !db.isAvailable()) return next();
     if (['/login', '/logout', '/health', '/auth/state', '/auth/signup'].includes(req.path)) {
       if (req.path === '/auth/signup') {
         try {
@@ -398,6 +400,7 @@ function startServer(state, getCtx) {
       }
     }
     state.log('Auto-reply ' + (enabled ? 'ENABLED' : 'DISABLED') + (state.autoReply.media ? ' (with media)' : ''));
+    settingsStore.save(state);
     res.json({ ok: true, autoReply: state.autoReply });
   });
 
@@ -408,6 +411,7 @@ function startServer(state, getCtx) {
     }
     state.automation.aiEnabled = aiEnabled;
     state.log('AI automation ' + (aiEnabled ? 'ENABLED - bot answers every customer like your business' : 'DISABLED - bot stays silent'));
+    settingsStore.save(state);
     res.json({ ok: true, automation: state.automation });
   });
 

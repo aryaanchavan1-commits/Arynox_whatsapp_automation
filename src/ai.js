@@ -52,7 +52,14 @@ async function callProvider(name, messages) {
 }
 
 async function getAIReply(text, history = [], state) {
-  const systemPrompt = state ? buildSystemPrompt(state, text) : config.aiSystemPrompt;
+  let systemPrompt = state ? buildSystemPrompt(state, text) : config.aiSystemPrompt;
+  if (state && state.autoReply && state.autoReply.enabled) {
+    const awayNote = (state.autoReply.message || '').trim();
+    systemPrompt += '\n\nIMPORTANT CONTEXT: The account owner is currently AWAY and cannot reply personally. ' +
+      'You are handling the conversation on their behalf. In your FIRST reply of this conversation, briefly let the customer know the owner is unavailable right now and will follow up later' +
+      (awayNote ? ' (you may phrase it like: "' + awayNote + '")' : '') +
+      '. After that, help them fully yourself: answer questions, share prices and details, and solve their problem. Never ignore the customer just because the owner is away.';
+  }
   const messages = [
     { role: 'system', content: systemPrompt },
     ...history.slice(-6),

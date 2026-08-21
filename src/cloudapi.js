@@ -196,20 +196,23 @@ async function processInbound(state, from, name, text, messageId) {
     } else if (lower === '!reset') {
       clearHistory(from);
       out = 'Conversation memory cleared. Starting fresh!';
-    } else if (state.autoReply.enabled) {
-      const media = state.autoReply.media ? findMedia(state.autoReply.media) : null;
-      await reply(state.autoReply.message, media);
-      return;
     } else if (state.automation.aiEnabled && text) {
       addToHistory(from, 'user', text);
       out = await getAIReply(text, getHistory(from).slice(0, -1), state);
       if (!out) {
-        state.log('AI returned nothing - staying silent for: ' + text.slice(0, 40));
+        if (state.autoReply.enabled) {
+          const media = state.autoReply.media ? findMedia(state.autoReply.media) : null;
+          await reply(state.autoReply.message, media);
+        }
         return;
       }
       const parsed = parseMediaTag(out);
       await reply(parsed.clean, parsed.file);
       addToHistory(from, 'assistant', parsed.clean);
+      return;
+    } else if (state.autoReply.enabled) {
+      const media = state.autoReply.media ? findMedia(state.autoReply.media) : null;
+      await reply(state.autoReply.message, media);
       return;
     }
     if (out) await reply(out);

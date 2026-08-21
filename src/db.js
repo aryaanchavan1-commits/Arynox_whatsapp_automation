@@ -106,7 +106,7 @@ async function kvSet(key, value) {
 
 // ---------- Data file sync (business/knowledge/safety/meta-config/chats-cache/media notes) ----------
 
-const DATA_FILES = ['business.json', 'knowledge.json', 'media.json', 'meta-config.json', 'safety.json', 'chats-cache.json'];
+const DATA_FILES = ['business.json', 'knowledge.json', 'media.json', 'meta-config.json', 'safety.json', 'chats-cache.json', 'settings.json'];
 const syncTimers = new Map();
 
 async function restoreDataFiles() {

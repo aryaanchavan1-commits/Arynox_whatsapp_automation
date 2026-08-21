@@ -5,6 +5,7 @@ const { loadBusiness, loadKnowledge } = require('./src/knowledge');
 const { listMedia } = require('./src/media');
 const { loadMetaConfig, isConfigured } = require('./src/cloudapi');
 const db = require('./src/db');
+const settingsStore = require('./src/settings');
 
 async function main() {
   let dbReady = false;
@@ -25,6 +26,7 @@ async function main() {
   }
 
   const metaConfig = loadMetaConfig();
+  const savedSettings = settingsStore.load();
 
   const state = {
     status: 'starting',
@@ -39,14 +41,8 @@ async function main() {
     config,
     business: loadBusiness(),
     knowledge: loadKnowledge(),
-    autoReply: {
-      enabled: config.autoReplyEnabled,
-      message: config.autoReplyMessage,
-      media: null,
-    },
-    automation: {
-      aiEnabled: true,
-    },
+    autoReply: savedSettings.autoReply,
+    automation: savedSettings.automation,
     bulk: { active: false, total: 0, sent: 0, failed: 0, current: '', status: '' },
     refreshMedia() {
       this.media = listMedia();
