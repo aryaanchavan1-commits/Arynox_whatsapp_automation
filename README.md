@@ -48,6 +48,26 @@ META_PUBLIC_URL=
 
 Anti-ban timing is in `config.js`: `minDelayBetweenMessages`, `maxDelayBetweenMessages`, `maxMessagesPerMinute`, `bulkMinDelay`, `bulkMaxDelay`.
 
+## Cloud database (Turso) & accounts
+
+The dashboard has real **signup / login** backed by a free [Turso](https://turso.tech) cloud database:
+
+1. Create a free Turso database (`turso db create`), generate a token (`turso db tokens create <name>`)
+2. Add to `.env`:
+   ```
+   TURSO_DATABASE_URL=libsql://your-db.turso.io
+   TURSO_AUTH_TOKEN=your-token
+   ```
+3. Open the dashboard — the first visit shows **Create Account** (one-time owner signup, scrypt-hashed password). After that, sign in with email + password. Extra signups are locked automatically.
+
+With Turso connected, the app also survives restarts and redeploys:
+
+- **WhatsApp session backup** — the session is snapshotted to the database after every credential change and restored automatically on boot, so you don't re-scan the QR after every deploy
+- **Data sync** — business profile, knowledge base, media notes, safety settings and contact cache are mirrored to the database and restored on boot
+- **Keep-alive** — set `SELF_PING_URL=https://your-app.onrender.com/api/health` so free hosts like Render never sleep
+
+Without Turso configured, everything still works on local files with the legacy `DASHBOARD_PASSWORD` login.
+
 ## Anti-ban safety system
 
 **Honest disclaimer:** no unofficial WhatsApp automation is 100% "unbannable" — WhatsApp's terms prohibit it, and anyone claiming otherwise is selling you something. What this app does is make bans *very unlikely* by behaving like a human and respecting recipients:

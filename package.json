@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@libsql/client": "^0.17.4",
     "@whiskeysockets/baileys": "^6.7.24",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",

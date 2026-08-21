@@ -306,10 +306,11 @@ code { background: var(--chip); padding: 2px 7px; border-radius: 6px; font-size:
   <div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:999;background:var(--bg);backdrop-filter:blur(8px);align-items:center;justify-content:center;">
     <div class="card" style="max-width:340px;width:calc(100% - 40px);text-align:center;">
       <div class="card-title" style="justify-content:center;">Arynox Automation</div>
-      <div class="hint" style="margin-top:0;margin-bottom:16px;">Enter your dashboard password to continue</div>
-      <input type="password" id="loginPass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
-      <button class="btn" style="width:100%;margin-top:10px;" onclick="doLogin()">Unlock Dashboard</button>
-      <div class="hint" id="loginError" style="color:#e5484d;margin-top:10px;display:none;">Wrong password</div>
+      <div class="hint" style="margin-top:0;margin-bottom:16px;" id="loginSubtitle">Sign in to continue</div>
+      <input type="email" id="loginEmail" placeholder="you@business.com" autocomplete="email" style="display:none;margin-bottom:10px;">
+      <input type="password" id="loginPass" placeholder="Password (min 8 characters)" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn" style="width:100%;margin-top:10px;" id="loginBtn" onclick="doLogin()">Sign In</button>
+      <div class="hint" id="loginError" style="color:#e5484d;margin-top:10px;display:none;">Wrong credentials</div>
     </div>
   </div>
 
@@ -631,26 +632,67 @@ const PAGE_TITLES = { overview: 'Overview', contacts: 'Contacts', send: 'Send Me
 function showLogin() {
   document.getElementById('loginOverlay').style.display = 'flex';
   document.getElementById('loginError').style.display = 'none';
-  setTimeout(() => document.getElementById('loginPass').focus(), 50);
+  setTimeout(() => {
+    const first = document.getElementById('loginEmail').style.display !== 'none'
+      ? document.getElementById('loginEmail') : document.getElementById('loginPass');
+    first.focus();
+  }, 50);
+}
+
+let authMode = 'legacy';
+
+async function detectAuthMode() {
+  try {
+    const r = await fetch('/api/auth/state');
+    const d = await r.json();
+    authMode = d.mode || 'legacy';
+    const emailBox = document.getElementById('loginEmail');
+    if (authMode === 'users') {
+      emailBox.style.display = 'block';
+      if (d.hasUsers) {
+        document.getElementById('loginSubtitle').textContent = 'Sign in with your account';
+        document.getElementById('loginBtn').textContent = 'Sign In';
+      } else {
+        document.getElementById('loginSubtitle').innerHTML = '<b>Create your owner account</b> - one-time setup, stored securely in your cloud database';
+        document.getElementById('loginBtn').textContent = 'Create Account';
+      }
+    } else if (authMode === 'open') {
+      document.getElementById('loginOverlay').style.display = 'none';
+      return;
+    }
+  } catch (e) { /* default legacy */ }
 }
 
 async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
   const pass = document.getElementById('loginPass').value;
+  const isSignup = authMode === 'users' && !signupClosed;
   try {
-    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass }) });
+    let r;
+    if (isSignup) {
+      r = await fetch('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: pass }) });
+    } else {
+      r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email, password: pass }) });
+    }
     const d = await r.json();
-    if (r.status === 401 || !d.ok) {
-      document.getElementById('loginError').style.display = 'block';
+    if (!r.ok || !d.ok) {
+      const err = document.getElementById('loginError');
+      err.textContent = d.error || 'Login failed';
+      err.style.display = 'block';
       return;
     }
+    signupClosed = true;
     document.getElementById('loginOverlay').style.display = 'none';
     document.getElementById('loginPass').value = '';
-    toast('Dashboard unlocked');
+    toast(isSignup ? 'Account created - welcome!' : 'Welcome back!');
     refresh();
   } catch (e) {
-    document.getElementById('loginError').style.display = 'block';
+    const err = document.getElementById('loginError');
+    err.textContent = e.message;
+    err.style.display = 'block';
   }
 }
+let signupClosed = false;
 
 async function logout() {
   try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
@@ -1208,6 +1250,7 @@ async function deleteMediaFile(fileName) {
 const savedTheme = localStorage.getItem('arynox-theme');
 if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
 
+detectAuthMode();
 loadMedia();
 refresh();
 setInterval(refresh, 3000);

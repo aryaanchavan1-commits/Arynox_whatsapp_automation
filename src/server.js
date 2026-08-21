@@ -19,6 +19,7 @@ const {
 } = require('./knowledge');
 const { listMedia, setNote, deleteMedia } = require('./media');
 const safety = require('./safety');
+const db = require('./db');
 const {
   isConfigured,
   toDigits,
@@ -53,33 +54,53 @@ function startServer(state, getCtx) {
   const isMeta = () => state.backend === 'meta';
   const authPassword = process.env.DASHBOARD_PASSWORD || '';
   const authRequired = !!authPassword;
+  const AUTH_SECRET = process.env.AUTH_SECRET || authPassword || 'arynox-local-secret-' + (process.env.SESSION_NAME || 'dev');
   const revokedTokens = new Set();
 
-  function signAuthToken() {
+  function signAuthToken(userId) {
     const exp = String(Date.now() + 7 * 24 * 3600 * 1000);
-    const sig = crypto.createHmac('sha256', authPassword).update(exp).digest('hex');
-    return exp + '.' + sig;
+    const payload = exp + '.' + String(userId == null ? 'local' : userId);
+    const sig = crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('hex');
+    return payload + '.' + sig;
   }
 
-  function isValidAuth(req) {
-    if (!authRequired) return true;
+  function parseAuth(req) {
     const cookie = req.headers.cookie || '';
     const m = cookie.match(/arynox_auth=([^;]+)/);
-    if (!m) return false;
-    if (revokedTokens.has(m[1])) return false;
-    const [exp, sig] = m[1].split('.');
-    if (!exp || !sig || Date.now() > Number(exp)) return false;
-    const expected = crypto.createHmac('sha256', authPassword).update(exp).digest('hex');
+    if (!m) return null;
+    if (revokedTokens.has(m[1])) return null;
+    const parts = m[1].split('.');
+    if (parts.length !== 3) return null;
+    const [exp, uid, sig] = parts;
+    if (!exp || Date.now() > Number(exp)) return null;
+    const expected = crypto.createHmac('sha256', AUTH_SECRET).update(exp + '.' + uid).digest('hex');
     try {
-      return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+      if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
     } catch (e) {
-      return false;
+      return null;
     }
+    return { userId: uid === 'local' ? null : Number(uid) };
   }
 
-  app.use('/api', (req, res, next) => {
-    if (req.path === '/login' || req.path === '/health') return next();
-    if (!isValidAuth(req)) {
+  function setAuthCookie(res, token) {
+    res.setHeader('Set-Cookie', 'arynox_auth=' + token + '; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800');
+  }
+
+  app.use('/api', async (req, res, next) => {
+    if (['/login', '/logout', '/health', '/auth/state', '/auth/signup'].includes(req.path)) {
+      if (req.path === '/auth/signup') {
+        try {
+          const users = db.isAvailable() ? await db.countUsers() : 0;
+          if (users > 0 && !parseAuth(req)) {
+            return res.status(403).json({ ok: false, error: 'Signup is closed - this workspace already has an owner' });
+          }
+        } catch (e) {
+          return res.status(500).json({ ok: false, error: 'Database error' });
+        }
+      }
+      return next();
+    }
+    if (!parseAuth(req)) {
       return res.status(401).json({ ok: false, error: 'Unauthorized - login required' });
     }
     next();
@@ -134,17 +155,64 @@ function startServer(state, getCtx) {
     });
   });
 
-  app.post('/api/login', (req, res) => {
-    if (!authRequired) return res.json({ ok: true, auth: false });
-    const { password } = req.body || {};
-    if (typeof password !== 'string' || password.length > 200) {
-      return res.status(400).json({ ok: false, error: 'Missing password' });
+  app.get('/api/auth/state', async (req, res) => {
+    try {
+      if (db.isAvailable()) {
+        const users = await db.countUsers();
+        return res.json({ ok: true, mode: 'users', hasUsers: users > 0 });
+      }
+      res.json({ ok: true, mode: authPassword ? 'legacy' : 'open', hasUsers: false });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: 'Database error' });
     }
-    if (password === authPassword) {
-      res.setHeader('Set-Cookie', 'arynox_auth=' + signAuthToken() + '; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800');
-      return res.json({ ok: true, auth: true });
+  });
+
+  app.post('/api/auth/signup', async (req, res) => {
+    if (!db.isAvailable()) {
+      return res.status(400).json({ ok: false, error: 'Database not configured (set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN)' });
     }
-    res.status(401).json({ ok: false, error: 'Wrong password' });
+    try {
+      const { email, password } = req.body || {};
+      const emailOk = typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+      if (!emailOk) return res.status(400).json({ ok: false, error: 'Enter a valid email address' });
+      if (typeof password !== 'string' || password.length < 8) {
+        return res.status(400).json({ ok: false, error: 'Password must be at least 8 characters' });
+      }
+      if (await db.getUserByEmail(email)) {
+        return res.status(409).json({ ok: false, error: 'Email already registered - log in instead' });
+      }
+      const user = await db.createUser(email, password);
+      state.log('New account created: ' + user.email);
+      setAuthCookie(res, signAuthToken(user.id));
+      res.json({ ok: true, user: { email: user.email } });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message || 'Signup failed' });
+    }
+  });
+
+  app.post('/api/login', async (req, res) => {
+    try {
+      const { email, password } = req.body || {};
+      if (db.isAvailable()) {
+        if (typeof email !== 'string' || typeof password !== 'string') {
+          return res.status(400).json({ ok: false, error: 'Email and password required' });
+        }
+        const user = await db.getUserByEmail(email);
+        if (!user || !db.verifyPassword(user, password)) {
+          return res.status(401).json({ ok: false, error: 'Wrong email or password' });
+        }
+        setAuthCookie(res, signAuthToken(user.id));
+        return res.json({ ok: true, user: { email: user.email } });
+      }
+      if (!authPassword) return res.json({ ok: true, auth: false });
+      if (typeof password === 'string' && password.length <= 200 && password === authPassword) {
+        setAuthCookie(res, signAuthToken(null));
+        return res.json({ ok: true, auth: true });
+      }
+      res.status(401).json({ ok: false, error: 'Wrong password' });
+    } catch (e) {
+      res.status(500).json({ ok: false, error: e.message || 'Login failed' });
+    }
   });
 
   app.post('/api/logout', (req, res) => {
@@ -167,7 +235,7 @@ function startServer(state, getCtx) {
       hasQr: !!state.qr,
       lastError: state.lastError,
       log: state.logs.slice(-20),
-      auth: authRequired,
+      auth: authRequired || db.isAvailable(),
       autoReply: state.autoReply,
       automation: state.automation,
       bulk: state.bulk,
@@ -522,7 +590,7 @@ function startServer(state, getCtx) {
 
   const server = app.listen(PORT, () => {
     console.log('Dashboard: http://localhost:' + PORT);
-    state.log('Dashboard running on http://localhost:' + PORT + (authRequired ? ' (password protected)' : ''));
+    state.log('Dashboard running on http://localhost:' + PORT + (authRequired || db.isAvailable() ? ' (login required)' : ''));
   });
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {

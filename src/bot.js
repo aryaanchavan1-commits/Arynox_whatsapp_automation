@@ -13,6 +13,8 @@ const { humanTypingDelay, interMessageDelay } = require('./utils/humanizer');
 const { sleep } = require('./utils/delay');
 const { getHistory, addToHistory, clearHistory, isProcessed, setLastMessage, getLastMessages } = require('./memory');
 const safety = require('./safety');
+const db = require('./db');
+const { restoreSession, scheduleSnapshot } = require('./sessionSync');
 
 const messageTimestamps = {};
 let activeCtx = null;
@@ -112,6 +114,9 @@ function makeStateLogger(state) {
 
 async function startBot(state) {
   const sessionDir = path.join(__dirname, '..', 'session_' + config.sessionName);
+  try {
+    await restoreSession(config.sessionName, state.log);
+  } catch (e) { /* continue with local session */ }
   const { state: authState, saveCreds } = await useMultiFileAuthState(sessionDir);
   const log = makeStateLogger(state);
 
@@ -163,7 +168,10 @@ async function startBot(state) {
     state.log('History sync complete: ' + (chats ? chats.length : 0) + ' chats (' + groups + ' groups), ' + (contacts ? contacts.length : 0) + ' contacts');
   });
 
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('creds.update', () => {
+    saveCreds().catch(() => {});
+    scheduleSnapshot(config.sessionName, state.log);
+  });
 
   state.status = 'starting';
   state.log('Bot starting...');
@@ -188,6 +196,7 @@ async function startBot(state) {
         state.phone = sock.user ? sock.user.id.split(':')[0] : null;
       } catch (e) { /* ignore */ }
       state.log('Bot is ready and connected - syncing contacts...');
+      scheduleSnapshot(config.sessionName, state.log);
       try {
         if (typeof sock.fetchMessageHistory === 'function') {
           sock.fetchMessageHistory(10000).catch(() => {});
