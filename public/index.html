@@ -512,10 +512,10 @@ code { background: var(--chip); padding: 2px 7px; border-radius: 6px; font-size:
         <div class="card">
           <div class="card-title">Away Mode (I'm Unavailable)</div>
           <div class="row" style="justify-content:space-between;margin-bottom:8px;">
-            <span style="font-weight:700;font-size:14px;">Owner is away - AI takes over</span>
+            <span style="font-weight:700;font-size:14px;">Auto-reply while away</span>
             <label class="toggle"><input type="checkbox" id="autoReplyToggle"><span class="sl"></span></label>
           </div>
-          <div class="hint" style="margin-top:0;">Turn ON when you're unavailable: the AI keeps answering customers and tells them you'll follow up later. With AI Automation OFF, this sends your fixed away message instead.</div>
+          <div class="hint" style="margin-top:0;">Master switch. OFF (default) = the bot never sends anything automatically - you reply personally. ON = customers get answers while you're away (AI if enabled above, otherwise your fixed message below).</div>
           <label class="f">Auto-reply message</label>
           <textarea id="autoReplyMsg" rows="2">I'm currently away and can't reply right now. I will get back to you as soon as possible.</textarea>
           <label class="f">Attach media (optional)</label>
@@ -544,10 +544,10 @@ code { background: var(--chip); padding: 2px 7px; border-radius: 6px; font-size:
         <div class="card">
           <div class="card-title">AI Engine <span class="chip" style="margin-left:auto;">Groq</span></div>
           <div class="row" style="justify-content:space-between;margin-bottom:8px;">
-            <span style="font-weight:700;font-size:14px;">AI Automation</span>
+            <span style="font-weight:700;font-size:14px;">Use AI while away</span>
             <label class="toggle"><input type="checkbox" id="aiAutoToggle" onchange="saveAutomation(this.checked)"><span class="sl"></span></label>
           </div>
-          <div class="hint" style="margin-top:0;">When ON, the AI automatically answers every customer like your business representative. When OFF, the bot stays silent.</div>
+          <div class="hint" style="margin-top:0;">The bot never sends anything by default. When you turn <b>Away Mode</b> on, this decides how customers are handled: ON = AI answers them fully (mentioning you'll follow up), OFF = your fixed away message is sent.</div>
           <div class="hint" id="aiInfo" style="margin-top:0;background:var(--bg3);border:1px solid var(--border-soft);border-radius:12px;padding:10px;margin-top:12px;"></div>
           <label class="f">Ask the AI to test it</label>
           <input type="text" id="aiQuestion" placeholder="e.g. What do you sell?" onkeydown="if(event.key==='Enter')testAI()">
@@ -1108,7 +1108,7 @@ async function saveAutomation(on) {
   try {
     const r = await fetch('/api/automation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ aiEnabled: on }) });
     const d = await r.json();
-    if (d.ok) toast(on ? 'AI automation ON - bot now answers every customer automatically' : 'AI automation OFF - bot stays silent');
+    if (d.ok) toast(on ? 'AI will handle customers while you are away' : 'While away, your fixed away message will be sent instead');
     else toast(d.error || 'Failed', 'error');
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 }

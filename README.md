@@ -4,7 +4,7 @@ A full WhatsApp automation bot with a 2026 AI-product dashboard. It answers cust
 
 ## Features
 
-- **AI automation** — answers every customer automatically like your business representative (Groq `openai/gpt-oss-120b`, fallback OpenCode Zen `deepseek-v4-flash-free`)
+- **AI automation** — by default the bot **never sends anything automatically**. When you turn on Away Mode, the AI answers customers on your behalf (mentioning you'll follow up later), with full business knowledge and conversation memory (Groq `openai/gpt-oss-120b`, fallback OpenCode Zen `deepseek-v4-flash-free`)
 - **Conversation memory** — remembers the last 10 messages per customer (no more context-less replies)
 - **Business profile** — teach the AI your business name, products, prices, tone and rules
 - **Knowledge base (RAG)** — upload PDF/TXT/MD documents (menu, catalog, policies); the AI reads them when answering

@@ -410,7 +410,7 @@ function startServer(state, getCtx) {
       return res.status(400).json({ ok: false, error: '"aiEnabled" must be a boolean' });
     }
     state.automation.aiEnabled = aiEnabled;
-    state.log('AI automation ' + (aiEnabled ? 'ENABLED - bot answers every customer like your business' : 'DISABLED - bot stays silent'));
+    state.log('AI while away ' + (aiEnabled ? 'ENABLED - AI answers customers when Away Mode is on' : 'DISABLED - fixed away message is sent when Away Mode is on'));
     settingsStore.save(state);
     res.json({ ok: true, automation: state.automation });
   });
